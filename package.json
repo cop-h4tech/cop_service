@@ -12,7 +12,7 @@
     "start:prod": "node dist/main.js",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts src/migrations/Migration",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
-    "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
+    "migration:run:prod": "node dist/migration-run.js",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
     "migration:create": "typeorm-ts-node-commonjs migration:create",
     "lint": "eslint \"{src,test}/**/*.ts\" --max-warnings=0",

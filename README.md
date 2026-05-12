@@ -218,15 +218,17 @@ Edit `.env` — set `DB_HOST=localhost` and fill in your local PostgreSQL creden
 ### 3. Create the database
 
 ```bash
-psql -U postgres -c "CREATE DATABASE citizen_on_petrol;"
-psql -U postgres -c "CREATE USER citizen_on_petrol WITH PASSWORD 'citizen123';"
-psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE citizen_on_petrol TO citizen_on_petrol;"
+psql -U postgres -c "CREATE DATABASE citizen_on_petrol_db;"
 ```
 
 ### 4. Run migrations
 
 ```bash
+npm run migration:generate  #(optional)
+
 npm run migration:run
+# if in production server
+npm run migrtion:run:prod
 ```
 
 ### 5. Start the development server
@@ -345,7 +347,6 @@ git push origin feat/my-feature
 2. Import the new module in `src/app.module.ts`.
 3. Register any new entities in both `app.module.ts` and `src/data-source.ts`.
 4. Generate and run a migration for schema changes.
-5. Document new endpoints in `API_DOCUMENTATION.md`.
 
 ### Pull request checklist
 
@@ -353,4 +354,3 @@ git push origin feat/my-feature
 - [ ] `npm run test` passes
 - [ ] Migrations generated and committed for any entity changes
 - [ ] `.env.example` updated for any new environment variables
-- [ ] `API_DOCUMENTATION.md` updated for any new or changed endpoints
