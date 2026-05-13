@@ -1,6 +1,6 @@
 import { IsEmail, IsString, Length } from 'class-validator';
 
-export class VerifyOTPDTO {
+export class VerifyEmailOTPDTO {
   @IsEmail()
   email!: string;
 

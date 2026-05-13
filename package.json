@@ -15,7 +15,7 @@
     "migrate:prod": "node dist/migration-run.js",
     "migrate:rollback": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
     "showmigrations": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts",
-    "lint": "eslint \"{src,test}/**/*.ts\" --max-warnings=0",
+    "lint": "tsc --noEmit && eslint \"{src,test}/**/*.ts\" --max-warnings=0",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },

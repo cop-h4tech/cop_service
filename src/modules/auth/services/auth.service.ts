@@ -1,28 +1,31 @@
-import { Injectable, BadRequestException, UnauthorizedException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, ConflictException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { UserEntity } from '../entities/user.entity';
 import { SignUpDTO } from '../dto/sign-up.dto';
 import { LoginDTO, AuthMode } from '../dto/sign-in.dto';
-import { VerifyOTPDTO } from '../dto/verify-otp.dto';
+import { VerifyEmailOTPDTO } from '../dto/verify-otp.dto';
 import { ResetPasswordRequestDTO, ResetPasswordDTO } from '../dto/reset-password.dto';
 import { ChangePasswordDTO } from '../dto/change-password.dto';
 import { OTPService } from './otp.service';
 import { EmailService } from './email.service';
 import { SessionService } from './session.service';
-// Restore when Twilio SMS is configured: import { SmsService } from './sms.service';
+import { SMSService } from './sms.service';
 import { OTPPurpose } from '../entities/otp.entity';
+import { maskPhone } from '../utils/mask.util';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly otpService: OTPService,
     private readonly emailService: EmailService,
     private readonly sessionService: SessionService,
-    // TODO: inject when Twilio SMS is configured: private readonly smsService: SmsService,
+    private readonly smsService: SMSService,
   ) {}
 
   async signUp(signUpDTO: SignUpDTO): Promise<{ message: string; email: string }> {
@@ -50,12 +53,17 @@ export class AuthService {
 
     const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.email);
     await this.emailService.sendOTP(signUpDTO.email, emailOtp.code, OTPPurpose.SIGNUP);
-    // TODO: create phone OTP and send via Twilio when SMS is configured
-    // const phoneOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.phone);
-    // await this.smsService.sendOTP(signUpDTO.phone, phoneOtp.code, OTPPurpose.SIGNUP);
+
+    try {
+      await this.smsService.sendOTP(signUpDTO.phone);
+    } catch (err) {
+      this.logger.warn(
+        `SMS OTP delivery failed for ${maskPhone(signUpDTO.phone)} — account created, user must request SMS OTP manually. Reason: ${err instanceof Error ? err.message : err}`,
+      );
+    }
 
     return {
-      message: 'Sign up successful. Please verify your email with the OTP sent.',
+      message: 'Sign up successful. Please verify your email and phone with the OTPs sent.',
       email: signUpDTO.email,
     };
   }
@@ -68,14 +76,23 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      throw new ForbiddenException('Account is not active. Please verify your email to activate your account.');
+      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
+      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
+      try {
+        await this.smsService.sendOTP(user.phone);
+      } catch (err) {
+        this.logger.warn(
+          `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+      throw new ForbiddenException(
+        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+      );
     }
 
     if (loginDTO.authMode === AuthMode.OTP) {
       const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNIN, user.email);
       await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNIN);
-      // TODO: send SMS OTP via Twilio when configured
-      // await this.smsService.sendOTP(user.phone, phoneOtp.code, OTPPurpose.SIGNIN);
 
       return { message: 'OTP sent to your registered email', authMode: AuthMode.OTP };
     }
@@ -106,7 +123,9 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      throw new ForbiddenException('Account is not active. Please verify your email to activate your account.');
+      throw new ForbiddenException(
+        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+      );
     }
 
     const isOTPValid = await this.otpService.verifyOTP(user, otp, OTPPurpose.SIGNIN);
@@ -124,7 +143,7 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
-  async verifyEmailOTP(verifyOTPDTO: VerifyOTPDTO): Promise<{ message: string }> {
+  async verifyEmailOTP(verifyOTPDTO: VerifyEmailOTPDTO): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({ where: { email: verifyOTPDTO.email } });
 
     if (!user) {
@@ -138,11 +157,70 @@ export class AuthService {
     }
 
     user.emailVerified = true;
-    user.isActive = true;
-    // Set isActive = true only after phoneVerified as well, once Twilio SMS is configured
+    if (user.phoneVerified) {
+      user.isActive = true;
+    }
     await this.userRepository.save(user);
 
-    return { message: 'Email verified successfully. You can now sign in.' };
+    return {
+      message: user.isActive
+        ? 'Email verified. You can now sign in.'
+        : 'Email verified. Please also verify your phone number.',
+    };
+  }
+
+  async verifySMSOTP(phone: string, code: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { phone } });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isVerified = await this.smsService.verifyOTP(phone, code);
+
+    if (!isVerified) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    user.phoneVerified = true;
+    if (user.emailVerified) {
+      user.isActive = true;
+    }
+    await this.userRepository.save(user);
+
+    return {
+      message: user.isActive
+        ? 'Phone verified. You can now sign in.'
+        : 'Phone verified. Please also verify your email address.',
+    };
+  }
+
+  async sendSMSOTP(phone: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { phone } });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.smsService.sendOTP(phone);
+    return { message: 'OTP sent to your phone number' };
+  }
+
+  async resendEmailOTP(email: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    const otp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, email);
+    await this.emailService.sendOTP(email, otp.code, OTPPurpose.SIGNUP);
+
+    return { message: 'Verification OTP resent to your email' };
   }
 
   async requestPasswordReset(dto: ResetPasswordRequestDTO): Promise<{ message: string }> {
@@ -153,7 +231,9 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      throw new ForbiddenException('Account is not active. Please verify your email to activate your account.');
+      throw new ForbiddenException(
+        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+      );
     }
 
     const otp = await this.otpService.createOTP(user, OTPPurpose.PASSWORD_RESET, dto.email);
