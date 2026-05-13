@@ -85,10 +85,40 @@ src/
   - `POST /auth/verify/sms-otp` — not `/auth/verify-otp`
 - Pattern: `/{resource}/{action}/{qualifier}` — qualifiers narrow the action, not the resource
 
-### Database
-- Table names: **snake_case** (depending on database conventions)
-- Column names: **snake_case**
-- Migration files: `timestamp-description.ts`
+### Database (PostgreSQL SQL Naming Conventions)
+
+PostgreSQL enforces the following rules for identifiers (table names, column names, etc.):
+
+- Names must **begin with a letter (`a–z`) or underscore (`_`)**.
+- Subsequent characters may be **letters, digits (`0–9`), or underscores** — no spaces, hyphens, or special characters without quoting.
+- **Maximum length is 31 characters** (`NAMEDATALEN - 1`; longer names are silently truncated).
+- **Unquoted names are always folded to lowercase** by PostgreSQL. `firstName`, `FirstName`, and `FIRSTNAME` all become `firstname` in the DB — which is why explicit `snake_case` column names must be set in TypeORM `@Column({ name: '...' })`.
+- Names containing spaces or reserved keywords must be **double-quoted** (`"my column"`), which also makes them case-sensitive — avoid this pattern entirely.
+
+**Conventions for this project:**
+
+- Table names: **plural snake_case** — `users`, `payment_info`, `otps`, `sessions`
+- Column names: **snake_case** — `first_name`, `email_verified`, `created_at`
+- Foreign key columns: **snake_case** — `user_id`, `order_id`
+- Migration files: timestamp prefix — `Migration1715698800000.ts`
+
+**TypeORM rule:** Always set an explicit `name` in `@Column()`, `@CreateDateColumn()`, `@UpdateDateColumn()`, and `@JoinColumn()` whenever the TypeScript property is camelCase. Without it, TypeORM writes the camelCase name directly and PostgreSQL lowercases it (e.g., `firstName` → column `firstname`, not `first_name`).
+
+```ts
+// Correct — explicit snake_case column name
+@Column({ type: 'varchar', name: 'first_name' })
+firstName!: string;
+
+@CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
+createdAt!: Date;
+
+@JoinColumn({ name: 'user_id' })
+user!: UserEntity;
+
+// Wrong — TypeORM will create column "firstname" (lowercased camelCase)
+@Column({ type: 'varchar' })
+firstName!: string;
+```
 
 ## Code Organization
 
@@ -221,19 +251,22 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 @Entity('features')
 export class FeatureEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, name: 'name' })
   name: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, name: 'description' })
   description?: string;
 
-  @CreateDateColumn()
+  @Column({ type: 'varchar', name: 'some_field' })
+  someField: string;
+
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 }
 ```

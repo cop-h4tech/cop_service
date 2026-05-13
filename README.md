@@ -166,7 +166,12 @@ PgAdmin credentials: `admin@citizen-on-petrol.com` / `admin123`
 ### 3. Run migrations (first time or after schema changes)
 
 ```bash
-docker compose run --rm migration npm run migration:run
+# On your host machine — generate the migration file and build
+npm run makemigrations
+npm run build
+
+# Then apply inside the container
+docker compose run --rm migration npm run migrate:prod
 ```
 
 ### 4. Check health
@@ -223,13 +228,25 @@ psql -U postgres -c "CREATE DATABASE citizen_on_petrol_db;"
 
 ### 4. Run migrations
 
+**Step 1 — Make the migration file** (always required first, after any entity change):
+
 ```bash
-# to genarte new migrations
-npm run migration:generate 
-# in dev server
-npm run migration:run
-# if in production server
-npm run migrtion:run:prod
+npm run makemigrations
+```
+
+This compares your entity files against the database and writes a new `src/migrations/MigrationXXXXXXXXXXXX.ts` with the SQL diff.
+
+**Step 2 — Apply the migration**
+
+*Development (no build needed):*
+```bash
+npm run migrate
+```
+
+*Production (compile first, then run):*
+```bash
+npm run build
+npm run migrate:prod
 ```
 
 ### 5. Start the development server
@@ -248,17 +265,105 @@ curl http://localhost:3000/health
 
 ## Database Migrations
 
-TypeORM migrations are used to manage schema changes. The `src/data-source.ts` file is the CLI entry point.
+TypeORM migrations manage all schema changes. The `src/data-source.ts` file is the CLI entry point.
 
-| Command | Description |
-|---------|-------------|
-| `npm run migration:run` | Apply all pending migrations |
-| `npm run migration:revert` | Revert the last applied migration |
-| `npm run migration:generate` | Generate a migration from entity diff |
-| `npm run migration:create` | Create an empty migration file |
-| `npm run migration:run:prod` | Run migrations from compiled `dist/` (production) |
+### Workflow
 
-> **Docker:** Prefix any migration command with `docker compose run --rm migration` to run it inside the container.
+```
+Step 1  npm run makemigrations   ← diff entities vs DB → writes src/migrations/MigrationXXX.ts
+Step 2  npm run migrate          ← apply it (local / dev, no build needed)
+   or
+Step 2a npm run build            ← compile .ts → dist/  (production only)
+Step 2b npm run migrate:prod     ← apply compiled migrations in production
+```
+
+> **Rule:** Never use `synchronize: true` in production. Always go through migrations.
+
+### Commands
+
+| Command | What it does |
+|---------|--------------|
+| `npm run makemigrations` | Diffs entities vs the DB → generates `src/migrations/MigrationXXX.ts` |
+| `npm run migrate` | Applies all pending migrations (dev, uses ts-node) |
+| `npm run migrate:prod` | Applies compiled migrations from `dist/` — run `build` first |
+| `npm run migrate:rollback` | Reverts the last applied migration |
+| `npm run showmigrations` | Lists every migration and whether it is applied `[X]` or pending `[ ]` |
+
+> **Docker:** Prefix with `docker compose run --rm migration` to run inside the container.
+
+### Detailed Example — Adding a column to an existing table
+
+**Scenario:** Add a `profilePicture` column to `UserEntity`.
+
+**1. Edit the entity file**
+
+```ts
+// src/modules/auth/entities/user.entity.ts
+@Column({ type: 'varchar', nullable: true })
+profilePicture?: string;
+```
+
+**2. Generate the migration**
+
+```bash
+npm run makemigrations
+```
+
+Output:
+```
+Migration /path/to/src/migrations/Migration1715698800000.ts has been generated successfully.
+```
+
+The generated file looks like this:
+
+```ts
+// src/migrations/Migration1715698800000.ts
+export class Migration1715698800000 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD "profilePicture" character varying`,
+    );
+  }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP COLUMN "profilePicture"`,
+    );
+  }
+}
+```
+
+**3a. Apply — local development**
+
+```bash
+npm run migrate
+# Migration1715698800000 has been executed successfully.
+```
+
+**3b. Apply — production**
+
+```bash
+npm run build
+npm run migrate:prod
+```
+
+**4. Check which migrations have been applied**
+
+```bash
+npm run showmigrations
+```
+
+Output:
+```
+ [X] Migration1715698800000   ← applied
+ [ ] Migration1715699900000   ← pending (not yet run)
+```
+
+**5. Roll back the last migration (if needed)**
+
+```bash
+npm run migrate:rollback
+# Migration1715698800000 has been reverted successfully.
+```
 
 ---
 
@@ -347,7 +452,8 @@ git push origin feat/my-feature
 1. Create `src/modules/<name>/` with a module, controller, service, entities, and DTOs.
 2. Import the new module in `src/app.module.ts`.
 3. Register any new entities in both `app.module.ts` and `src/data-source.ts`.
-4. Generate and run a migration for schema changes.
+4. Run `npm run makemigrations` to generate the migration file.
+5. Apply it: `npm run migrate` (local dev) or `npm run build && npm run migrate:prod` (production).
 
 ### Pull request checklist
 

@@ -22,7 +22,7 @@ import { SessionEntity } from './modules/auth/entities/session.entity';
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       entities: [UserEntity, OtpEntity, PaymentInfoEntity, SessionEntity],
-      synchronize: process.env.NODE_ENV !== 'production',
+      synchronize: false,
       logging: false,
       extra: {
         options: `-c timezone=${process.env.DB_TIMEZONE ?? 'UTC'}`,

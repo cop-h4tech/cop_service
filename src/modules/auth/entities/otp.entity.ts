@@ -13,28 +13,28 @@ export class OtpEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'user_id' })
   userId!: string;
 
   @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user!: UserEntity;
 
-  @Column({ type: 'varchar', length: 6 })
+  @Column({ type: 'varchar', length: 6, name: 'code' })
   code!: string;
 
-  @Column({ type: 'enum', enum: OTPPurpose })
+  @Column({ type: 'enum', enum: OTPPurpose, name: 'purpose' })
   purpose!: OTPPurpose;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: 'boolean', default: false, name: 'is_verified' })
   isVerified!: boolean;
 
-  @Column({ type: 'varchar', nullable: true })
-  sentTo?: string; // email or phone
+  @Column({ type: 'varchar', nullable: true, name: 'sent_to' })
+  sentTo?: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz', name: 'expires_at' })
   expiresAt!: Date;
 }
