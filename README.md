@@ -224,8 +224,9 @@ psql -U postgres -c "CREATE DATABASE citizen_on_petrol_db;"
 ### 4. Run migrations
 
 ```bash
-npm run migration:generate  #(optional)
-
+# to genarte new migrations
+npm run migration:generate 
+# in dev server
 npm run migration:run
 # if in production server
 npm run migrtion:run:prod
