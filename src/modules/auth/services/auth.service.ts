@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { UserEntity } from '../entities/user.entity';
 import { SignUpDTO } from '../dto/sign-up.dto';
 import { LoginDTO, AuthMode } from '../dto/sign-in.dto';
-import { VerifyOTPDTO } from '../dto/verify-otp.dto';
+import { VerifyEmailOTPDTO } from '../dto/verify-otp.dto';
 import { ResetPasswordRequestDTO, ResetPasswordDTO } from '../dto/reset-password.dto';
 import { ChangePasswordDTO } from '../dto/change-password.dto';
 import { OTPService } from './otp.service';
@@ -143,7 +143,7 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
-  async verifyEmailOTP(verifyOTPDTO: VerifyOTPDTO): Promise<{ message: string }> {
+  async verifyEmailOTP(verifyOTPDTO: VerifyEmailOTPDTO): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({ where: { email: verifyOTPDTO.email } });
 
     if (!user) {
@@ -204,6 +204,23 @@ export class AuthService {
 
     await this.smsService.sendOTP(phone);
     return { message: 'OTP sent to your phone number' };
+  }
+
+  async resendEmailOTP(email: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    const otp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, email);
+    await this.emailService.sendOTP(email, otp.code, OTPPurpose.SIGNUP);
+
+    return { message: 'Verification OTP resent to your email' };
   }
 
   async requestPasswordReset(dto: ResetPasswordRequestDTO): Promise<{ message: string }> {

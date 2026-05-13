@@ -2,9 +2,10 @@ import { Controller, Post, Body, Headers, UseGuards } from '@nestjs/common';
 import { AuthService } from './services/auth.service';
 import { SignUpDTO } from './dto/sign-up.dto';
 import { LoginDTO } from './dto/sign-in.dto';
-import { VerifyOTPDTO } from './dto/verify-otp.dto';
+import { VerifyEmailOTPDTO } from './dto/verify-otp.dto';
 import { VerifySMSOTPDTO } from './dto/verify-sms-otp.dto';
-import { SendOTPDTO } from './dto/send-otp.dto';
+import { SendSMSOTPDTO } from './dto/send-otp.dto';
+import { ResendEmailOTPDTO } from './dto/resend-otp.dto';
 import { ResetPasswordRequestDTO, ResetPasswordDTO } from './dto/reset-password.dto';
 import { ChangePasswordDTO } from './dto/change-password.dto';
 import { AuthGuard } from './guards/auth.guard';
@@ -51,7 +52,7 @@ export class AuthController {
      * Verify email OTP sent after signup.
      */
     @Post('verify/email-otp')
-    async verifyEmailOTP(@Body() verifyOTPDTO: VerifyOTPDTO) {
+    async verifyEmailOTP(@Body() verifyOTPDTO: VerifyEmailOTPDTO) {
         return this.authService.verifyEmailOTP(verifyOTPDTO);
     }
 
@@ -66,12 +67,21 @@ export class AuthController {
     }
 
     /**
-     * POST /auth/send-sms-otp
+     * POST /auth/verify/resend-sms-otp
      * (Re)send an SMS OTP to the given phone number via Twilio.
      */
-    @Post('send-sms-otp')
-    async sendSMSOTP(@Body() dto: SendOTPDTO) {
+    @Post('verify/resend-sms-otp')
+    async sendSMSOTP(@Body() dto: SendSMSOTPDTO) {
         return this.authService.sendSMSOTP(dto.phone);
+    }
+
+    /**
+     * POST /auth/verify/resend-email-otp
+     * Resend the email verification OTP for unverified accounts.
+     */
+    @Post('verify/resend-email-otp')
+    async resendEmailOTP(@Body() dto: ResendEmailOTPDTO) {
+        return this.authService.resendEmailOTP(dto.email);
     }
 
     /**
@@ -85,28 +95,28 @@ export class AuthController {
     }
 
     /**
-     * POST /auth/reset-password/request
+     * POST /auth/verify/reset-password
      * Send a password reset OTP to the registered email.
      */
-    @Post('reset-password/request')
+    @Post('verify/reset-password')
     async requestPasswordReset(@Body() dto: ResetPasswordRequestDTO) {
         return this.authService.requestPasswordReset(dto);
     }
 
     /**
-     * POST /auth/reset-password
+     * POST /auth/password/reset
      * Verify reset OTP and set a new password.
      */
-    @Post('reset-password')
+    @Post('password/reset')
     async resetPassword(@Body() dto: ResetPasswordDTO) {
         return this.authService.resetPassword(dto);
     }
 
     /**
-     * POST /auth/change-password
+     * POST /auth/password/change
      * Change password for an authenticated user.
      */
-    @Post('change-password')
+    @Post('password/change')
     @UseGuards(AuthGuard)
     async changePassword(
         @CurrentUser() user: { userId: string },
