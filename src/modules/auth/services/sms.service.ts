@@ -6,16 +6,14 @@ import {
 
 import { ConfigService } from '@nestjs/config';
 
-import * as Twilio from 'twilio';
+import twilio, { Twilio } from 'twilio';
 import { maskPhone } from '../utils/mask.util';
 
 @Injectable()
-export class SmsService {
-  private readonly logger = new Logger(
-    SmsService.name,
-  );
+export class SMSService {
+  private readonly logger = new Logger(SMSService.name);
 
-  private readonly twilioClient: Twilio.Twilio;
+  private readonly twilioClient: Twilio;
 
   private readonly verifyServiceSid: string;
 
@@ -23,45 +21,29 @@ export class SmsService {
     private readonly configService: ConfigService,
   ) {
     const accountSid =
-      this.configService.get<string>(
-        'TWILIO_ACCOUNT_SID',
-      );
+      this.configService.get<string>('TWILIO_ACCOUNT_SID');
 
     const authToken =
-      this.configService.get<string>(
-        'TWILIO_AUTH_TOKEN',
-      );
+      this.configService.get<string>('TWILIO_AUTH_TOKEN');
 
     this.verifyServiceSid =
-      this.configService.get<string>(
-        'TWILIO_VERIFY_SERVICE_SID',
-      ) as string;
+      this.configService.get<string>('TWILIO_VERIFY_SERVICE_SID') as string;
 
-    if (
-      !accountSid ||
-      !authToken ||
-      !this.verifyServiceSid
-    ) {
-      throw new Error(
-        'Twilio Verify configuration is missing',
-      );
+    if (!accountSid || !authToken || !this.verifyServiceSid) {
+      throw new Error('Twilio Verify configuration is missing');
     }
 
-    this.twilioClient = Twilio(
-      accountSid,
-      authToken,
-    );
+    this.twilioClient = twilio(accountSid, authToken);
   }
 
-  async sendOTP(phone: string, _code?: string, _purpose?: string): Promise<void> {
+  async sendOTP(phone: string): Promise<void> {
     try {
-      const response =
-        await this.twilioClient.verify.v2
-          .services(this.verifyServiceSid)
-          .verifications.create({
-            to: phone,
-            channel: 'sms',
-          });
+      const response = await this.twilioClient.verify.v2
+        .services(this.verifyServiceSid)
+        .verifications.create({
+          to: phone,
+          channel: 'sms',
+        });
 
       this.logger.log(
         `OTP sent to ${maskPhone(phone)}. Status: ${response.status}`,
@@ -69,37 +51,27 @@ export class SmsService {
     } catch (error) {
       this.logger.error(
         `Failed to send OTP to ${maskPhone(phone)}`,
-        error instanceof Error
-          ? error.stack
-          : undefined,
+        error instanceof Error ? error.stack : undefined,
       );
 
-      throw new BadRequestException(
-        'Failed to send OTP',
-      );
+      throw new BadRequestException('Failed to send OTP');
     }
   }
 
-  async verifyOTP(
-    phone: string,
-    code: string,
-  ): Promise<boolean> {
+  async verifyOTP(phone: string, code: string): Promise<boolean> {
     try {
-      const response =
-        await this.twilioClient.verify.v2
-          .services(this.verifyServiceSid)
-          .verificationChecks.create({
-            to: phone,
-            code,
-          });
+      const response = await this.twilioClient.verify.v2
+        .services(this.verifyServiceSid)
+        .verificationChecks.create({
+          to: phone,
+          code,
+        });
 
       return response.status === 'approved';
     } catch (error) {
       this.logger.error(
         `OTP verification failed for ${maskPhone(phone)}`,
-        error instanceof Error
-          ? error.stack
-          : undefined,
+        error instanceof Error ? error.stack : undefined,
       );
 
       return false;
