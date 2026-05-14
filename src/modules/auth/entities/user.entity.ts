@@ -6,17 +6,17 @@ export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', unique: true, name: 'email' })
-  email!: string;
+  @Column({ type: 'varchar', unique: true, nullable: true, name: 'email' })
+  email?: string;
 
-  @Column({ type: 'varchar', unique: true, name: 'phone' })
-  phone!: string;
+  @Column({ type: 'varchar', unique: true, nullable: true, name: 'phone' })
+  phone?: string;
 
-  @Column({ type: 'varchar', name: 'first_name' })
-  firstName!: string;
+  @Column({ type: 'varchar', nullable: true, name: 'first_name' })
+  firstName?: string;
 
-  @Column({ type: 'varchar', name: 'last_name' })
-  lastName!: string;
+  @Column({ type: 'varchar', nullable: true, name: 'last_name' })
+  lastName?: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'id_proof' })
   idProof?: string;

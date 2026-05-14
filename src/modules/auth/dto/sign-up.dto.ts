@@ -2,17 +2,21 @@ import { IsEmail, IsPhoneNumber, IsString, MinLength, IsOptional, Matches, Valid
 import { Match } from '../decorators/match.decorator';
 
 export class SignUpDTO {
+  @ValidateIf(o => !o.phone)
   @IsEmail()
-  email!: string;
+  email?: string;
 
+  @ValidateIf(o => !o.email)
   @IsPhoneNumber()
-  phone!: string;
+  phone?: string;
 
+  @IsOptional()
   @IsString()
-  firstName!: string;
+  firstName?: string;
 
+  @IsOptional()
   @IsString()
-  lastName!: string;
+  lastName?: string;
 
   @IsOptional()
   @IsString()

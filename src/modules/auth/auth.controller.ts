@@ -85,6 +85,15 @@ export class AuthController {
     }
 
     /**
+     * POST /auth/refresh
+     * Exchange a valid refresh token for a new access + refresh token pair (rotation).
+     */
+    @Post('refresh')
+    async refresh(@Body() body: { refreshToken: string }) {
+        return this.authService.refresh(body.refreshToken);
+    }
+
+    /**
      * POST /auth/logout
      * Revoke the session token to log out.
      */

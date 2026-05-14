@@ -28,11 +28,16 @@ export class AuthService {
     private readonly smsService: SMSService,
   ) {}
 
-  async signUp(signUpDTO: SignUpDTO): Promise<{ message: string; email: string }> {
-    const existingUser = await this.userRepository.findOne({
-      where: [{ email: signUpDTO.email }, { phone: signUpDTO.phone }],
-    });
+  async signUp(signUpDTO: SignUpDTO): Promise<{ message: string; identifier: string }> {
+    if (!signUpDTO.email && !signUpDTO.phone) {
+      throw new BadRequestException('Either email or phone number is required');
+    }
 
+    const conditions: object[] = [];
+    if (signUpDTO.email) conditions.push({ email: signUpDTO.email });
+    if (signUpDTO.phone) conditions.push({ phone: signUpDTO.phone });
+
+    const existingUser = await this.userRepository.findOne({ where: conditions });
     if (existingUser) {
       throw new ConflictException('User with this email or phone already exists');
     }
@@ -51,24 +56,34 @@ export class AuthService {
 
     await this.userRepository.save(user);
 
-    const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.email);
-    await this.emailService.sendOTP(signUpDTO.email, emailOtp.code, OTPPurpose.SIGNUP);
-
-    try {
-      await this.smsService.sendOTP(signUpDTO.phone);
-    } catch (err) {
-      this.logger.warn(
-        `SMS OTP delivery failed for ${maskPhone(signUpDTO.phone)} — account created, user must request SMS OTP manually. Reason: ${err instanceof Error ? err.message : err}`,
-      );
+    if (signUpDTO.email) {
+      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.email);
+      await this.emailService.sendOTP(signUpDTO.email, emailOtp.code, OTPPurpose.SIGNUP);
     }
 
+    if (signUpDTO.phone) {
+      try {
+        await this.smsService.sendOTP(signUpDTO.phone);
+      } catch (err) {
+        this.logger.warn(
+          `SMS OTP delivery failed for ${maskPhone(signUpDTO.phone)} — account created, user must request SMS OTP manually. Reason: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    const verifyInstructions = signUpDTO.email && signUpDTO.phone
+      ? 'Please verify your email and phone with the OTPs sent.'
+      : signUpDTO.email
+        ? 'Please verify your email with the OTP sent.'
+        : 'Please verify your phone number with the OTP sent.';
+
     return {
-      message: 'Sign up successful. Please verify your email and phone with the OTPs sent.',
-      email: signUpDTO.email,
+      message: `Sign up successful. ${verifyInstructions}`,
+      identifier: signUpDTO.email ?? signUpDTO.phone!,
     };
   }
 
-  async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; token?: string }> {
+  async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; accessToken?: string; refreshToken?: string; expiresIn?: number }> {
     const user = await this.userRepository.findOne({ where: { email: loginDTO.email } });
 
     if (!user) {
@@ -76,21 +91,28 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
-      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
-      try {
-        await this.smsService.sendOTP(user.phone);
-      } catch (err) {
-        this.logger.warn(
-          `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
-        );
+      if (user.email) {
+        const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
+        await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
+      }
+      if (user.phone) {
+        try {
+          await this.smsService.sendOTP(user.phone);
+        } catch (err) {
+          this.logger.warn(
+            `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
+          );
+        }
       }
       throw new ForbiddenException(
-        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+        'Account is not active. Please verify your registered contact to activate your account.',
       );
     }
 
     if (loginDTO.authMode === AuthMode.OTP) {
+      if (!user.email) {
+        throw new BadRequestException('OTP login via email requires an email address on this account');
+      }
       const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNIN, user.email);
       await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNIN);
 
@@ -111,11 +133,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid password');
     }
 
-    const session = await this.sessionService.createSession(user.id, user.email);
-    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, token: session.token };
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.id);
+    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, accessToken, refreshToken, expiresIn };
   }
 
-  async verifyLoginOTP(email: string, otp: string): Promise<{ message: string; token: string }> {
+  async verifyLoginOTP(email: string, otp: string): Promise<{ message: string; accessToken: string; refreshToken: string; expiresIn: number }> {
     const user = await this.userRepository.findOne({ where: { email } });
 
     if (!user) {
@@ -124,7 +146,7 @@ export class AuthService {
 
     if (!user.isActive) {
       throw new ForbiddenException(
-        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+        'Account is not active. Please verify your registered contact to activate your account.',
       );
     }
 
@@ -134,8 +156,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    const session = await this.sessionService.createSession(user.id, user.email);
-    return { message: 'Sign in successful', token: session.token };
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.id);
+    return { message: 'Sign in successful', accessToken, refreshToken, expiresIn };
+  }
+
+  async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    return this.sessionService.refreshSession(refreshToken);
   }
 
   async logout(token: string): Promise<{ message: string }> {
@@ -157,7 +183,8 @@ export class AuthService {
     }
 
     user.emailVerified = true;
-    if (user.phoneVerified) {
+    // Activate if the user has no phone (email-only signup) or phone is already verified
+    if (!user.phone || user.phoneVerified) {
       user.isActive = true;
     }
     await this.userRepository.save(user);
@@ -183,7 +210,8 @@ export class AuthService {
     }
 
     user.phoneVerified = true;
-    if (user.emailVerified) {
+    // Activate if the user has no email (phone-only signup) or email is already verified
+    if (!user.email || user.emailVerified) {
       user.isActive = true;
     }
     await this.userRepository.save(user);
