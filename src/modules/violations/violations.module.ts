@@ -14,4 +14,4 @@ import { UserEntity } from '../auth/entities/user.entity';
   controllers: [ViolationsController],
   providers: [ViolationsService],
 })
-export class ViolationsModule {}
+export class ViolationsModule { }

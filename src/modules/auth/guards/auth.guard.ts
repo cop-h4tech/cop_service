@@ -10,7 +10,7 @@ import { SessionService } from '../services/session.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly sessionService: SessionService) {}
+  constructor(private readonly sessionService: SessionService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();

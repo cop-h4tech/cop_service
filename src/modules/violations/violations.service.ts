@@ -35,7 +35,7 @@ export class ViolationsService {
     private readonly emailService: EmailService,
     private readonly smsService: SMSService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   private generateTicketNumber(): string {
     const datePart = new Date().toISOString().slice(0, 10).replaceAll('-', '');

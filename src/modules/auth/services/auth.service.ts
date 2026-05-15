@@ -37,7 +37,7 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly sessionService: SessionService,
     private readonly smsService: SMSService,
-  ) {}
+  ) { }
 
   async signUp(
     signUpDTO: SignUpDTO,

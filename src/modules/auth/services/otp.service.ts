@@ -9,7 +9,7 @@ export class OTPService {
   constructor(
     @InjectRepository(OtpEntity)
     private readonly otpRepository: Repository<OtpEntity>,
-  ) {}
+  ) { }
 
   /**
    * Generate a random 6-digit OTP

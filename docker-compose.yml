@@ -9,13 +9,13 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "${DB_PORT}:5500"
+      - "5500:${DB_PORT}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - citizen_on_petrol_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -87,4 +87,3 @@ volumes:
 networks:
   citizen_on_petrol_network:
     driver: bridge
-

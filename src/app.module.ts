@@ -33,4 +33,4 @@ import { entities } from './entities';
     ViolationsModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

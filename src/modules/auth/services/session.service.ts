@@ -16,7 +16,7 @@ export class SessionService {
   constructor(
     @InjectRepository(SessionEntity)
     private readonly sessionRepository: Repository<SessionEntity>,
-  ) {}
+  ) { }
 
   async createSession(
     userId: string,

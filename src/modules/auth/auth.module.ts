@@ -42,4 +42,4 @@ import { SessionEntity } from './entities/session.entity';
     SMSService,
   ],
 })
-export class AuthModule {}
+export class AuthModule { }

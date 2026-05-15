@@ -17,11 +17,11 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then \
-      npm ci --omit=dev --legacy-peer-deps; \
-    else \
-      npm install --omit=dev --legacy-peer-deps; \
-    fi && \
-    npm cache clean --force
+  npm ci --omit=dev --legacy-peer-deps; \
+  else \
+  npm install --omit=dev --legacy-peer-deps; \
+  fi && \
+  npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
