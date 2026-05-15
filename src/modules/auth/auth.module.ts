@@ -18,6 +18,6 @@ import { SessionEntity } from './entities/session.entity';
   imports: [TypeOrmModule.forFeature([UserEntity, OtpEntity, PaymentInfoEntity, SessionEntity])],
   controllers: [AuthController, UserController],
   providers: [AuthService, OTPService, UserService, EmailService, SMSService, SessionService, AuthGuard],
-  exports: [AuthService, UserService, AuthGuard, SessionService],
+  exports: [AuthService, UserService, AuthGuard, SessionService, EmailService, SMSService],
 })
 export class AuthModule {}

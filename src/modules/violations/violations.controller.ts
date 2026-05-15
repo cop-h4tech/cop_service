@@ -6,22 +6,22 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ViolationsService } from './violations.service';
 import { SubmitViolationDto } from './dto/submit-violation.dto';
-import { MediaType } from './entities/violation.entity';
-
-const PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const VIDEO_MIMES = new Set(['video/mp4', 'video/quicktime', 'video/x-msvideo']);
+import { PHOTO_MIMES, VIDEO_MIMES } from './violations.constants';
 const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+const PHOTO_MAX_COUNT = 5;
+const VIDEO_MAX_COUNT = 3;
+const TOTAL_MAX_COUNT = PHOTO_MAX_COUNT + VIDEO_MAX_COUNT;
 
 @Controller('violations')
 @UseGuards(AuthGuard)
@@ -30,19 +30,15 @@ export class ViolationsController {
 
   @Post()
   @UseInterceptors(
-    FileInterceptor('media', {
+    FilesInterceptor('media', TOTAL_MAX_COUNT, {
       storage: memoryStorage(),
-      fileFilter: (req, file, cb) => {
-        const mediaType = (req.body as { mediaType?: string })?.mediaType;
-        if (mediaType === MediaType.PHOTO && PHOTO_MIMES.has(file.mimetype)) {
-          return cb(null, true);
-        }
-        if (mediaType === MediaType.VIDEO && VIDEO_MIMES.has(file.mimetype)) {
+      fileFilter: (_req, file, cb) => {
+        if (PHOTO_MIMES.has(file.mimetype) || VIDEO_MIMES.has(file.mimetype)) {
           return cb(null, true);
         }
         cb(
           new BadRequestException(
-            `Invalid file type "${file.mimetype}" for mediaType "${mediaType ?? 'unknown'}"`,
+            `Unsupported file type "${file.mimetype}". Accepted images: JPEG, PNG, WebP, AVIF, HEIC, GIF. Accepted videos: MP4, MOV, AVI, MPEG, WebM, 3GP, MKV`,
           ),
           false,
         );
@@ -53,15 +49,29 @@ export class ViolationsController {
   async submit(
     @CurrentUser() user: { userId: string },
     @Body() dto: SubmitViolationDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
-    if (!file) {
-      throw new BadRequestException('Media file is required');
+    if (!files || files.length === 0) {
+      throw new BadRequestException('At least one media file is required');
     }
-    if (dto.mediaType === MediaType.PHOTO && file.size > PHOTO_MAX_BYTES) {
-      throw new BadRequestException('Photo must be 10 MB or smaller');
+
+    const photos = files.filter((f) => PHOTO_MIMES.has(f.mimetype));
+    const videos = files.filter((f) => VIDEO_MIMES.has(f.mimetype));
+
+    if (photos.length > PHOTO_MAX_COUNT) {
+      throw new BadRequestException(`Maximum ${PHOTO_MAX_COUNT} photos per submission`);
     }
-    return this.violationsService.submit(user.userId, dto, file);
+
+    if (videos.length > VIDEO_MAX_COUNT) {
+      throw new BadRequestException(`Maximum ${VIDEO_MAX_COUNT} videos per submission`);
+    }
+
+    const oversized = photos.find((f) => f.size > PHOTO_MAX_BYTES);
+    if (oversized) {
+      throw new BadRequestException(`Photo "${oversized.originalname}" exceeds the 10 MB limit`);
+    }
+
+    return this.violationsService.submit(user.userId, dto, files);
   }
 
   @Get()

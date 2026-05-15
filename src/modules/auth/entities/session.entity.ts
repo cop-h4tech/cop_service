@@ -13,7 +13,7 @@ export class SessionEntity {
   @JoinColumn({ name: 'user_id' })
   user!: UserEntity;
 
-  @Column({ type: 'varchar', name: 'user_identifier' })
+  @Column({ type: 'varchar', name: 'user_identifier', default: '' })
   userIdentifier!: string;
 
   @Column({ type: 'varchar', unique: true, name: 'token' })
@@ -22,7 +22,7 @@ export class SessionEntity {
   @Column({ type: 'timestamptz', nullable: true, name: 'expires_at' })
   expiresAt!: Date | null;
 
-  @Column({ type: 'varchar', unique: true, name: 'refresh_token' })
+  @Column({ type: 'varchar', unique: true, name: 'refresh_token', default: () => "uuid_generate_v4()::text" })
   refreshToken!: string;
 
   @Column({ type: 'timestamptz', nullable: true, name: 'refresh_token_expires_at' })

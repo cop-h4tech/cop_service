@@ -10,7 +10,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
-    "makemigrations": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts src/migrations/Migration",
+    "makemigrations": "ts-node --project scripts/tsconfig.json scripts/safe-migration.ts",
     "migrate": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
     "migrate:prod": "node dist/migration-run.js",
     "migrate:rollback": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",

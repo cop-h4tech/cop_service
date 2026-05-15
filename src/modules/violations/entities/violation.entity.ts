@@ -14,7 +14,15 @@ export enum MediaType {
   VIDEO = 'video',
 }
 
-export enum ViolationType {
+export enum MovingViolationType {
+  RAN_RED_LIGHT_STOP_SIGN = 'ran_red_light_stop_sign',
+  EXPIRED_REGISTRATION_INSPECTION = 'expired_registration_inspection',
+  MISSING_ILLEGAL_PLATES = 'missing_illegal_plates',
+  FAILURE_TO_SIGNAL = 'failure_to_signal',
+  NO_SEATBELT = 'no_seatbelt',
+}
+
+export enum ParkingViolationType {
   NO_PARKING_ZONE = 'no_parking_zone',
   BUS_STOP = 'bus_stop',
   LOADING_ZONE = 'loading_zone',
@@ -28,6 +36,10 @@ export enum ViolationType {
   NOT_WITHIN_MARKED_SPACE = 'not_within_marked_space',
   EXPIRED_METER = 'expired_meter',
 }
+
+// Combined enum for DB column definition and validation
+export const ViolationType = { ...MovingViolationType, ...ParkingViolationType } as const;
+export type ViolationType = MovingViolationType | ParkingViolationType;
 
 export enum ViolationStatus {
   PENDING = 'pending',
@@ -53,8 +65,8 @@ export class ViolationEntity {
   @Column({ type: 'enum', enum: MediaType, name: 'media_type' })
   mediaType!: MediaType;
 
-  @Column({ type: 'varchar', name: 'media_url' })
-  mediaUrl!: string;
+  @Column({ type: 'jsonb', name: 'media_urls' })
+  mediaUrls!: string[];
 
   @Column({ type: 'varchar', name: 'vehicle_make' })
   vehicleMake!: string;
@@ -65,6 +77,15 @@ export class ViolationEntity {
   @Column({ type: 'varchar', name: 'vehicle_model' })
   vehicleModel!: string;
 
+  @Column({ type: 'varchar', name: 'license_plate' })
+  licensePlate!: string;
+
+  @Column({ type: 'varchar', name: 'vehicle_color', nullable: true })
+  vehicleColor?: string;
+
+  @Column({ type: 'varchar', name: 'detected_plate', nullable: true })
+  detectedPlate?: string;
+
   @Column({ type: 'decimal', precision: 10, scale: 7, name: 'latitude' })
   latitude!: number;
 
@@ -74,8 +95,11 @@ export class ViolationEntity {
   @Column({ type: 'enum', enum: ViolationType, name: 'violation_type' })
   violationType!: ViolationType;
 
-  @Column({ type: 'boolean', name: 'was_moving' })
-  wasMoving!: boolean;
+  @Column({ type: 'boolean', nullable: true, name: 'was_moving' })
+  wasMoving?: boolean | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'violation_timestamp' })
+  violationTimestamp?: Date;
 
   @Column({
     type: 'enum',

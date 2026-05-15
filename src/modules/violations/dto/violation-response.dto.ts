@@ -14,8 +14,7 @@ export class ViolationResponseDto {
   @Expose()
   mediaType!: MediaType;
 
-  @Expose()
-  mediaUrl!: string;
+  mediaUrls!: string[];
 
   @Expose()
   vehicleMake!: string;
@@ -27,18 +26,30 @@ export class ViolationResponseDto {
   vehicleModel!: string;
 
   @Expose()
-  @Transform(({ value }) => parseFloat(value as string))
+  licensePlate!: string;
+
+  @Expose()
+  vehicleColor?: string;
+
+  @Expose()
+  detectedPlate?: string;
+
+  @Expose()
+  @Transform(({ value }) => Number.parseFloat(value as string))
   latitude!: number;
 
   @Expose()
-  @Transform(({ value }) => parseFloat(value as string))
+  @Transform(({ value }) => Number.parseFloat(value as string))
   longitude!: number;
 
   @Expose()
   violationType!: ViolationType;
 
   @Expose()
-  wasMoving!: boolean;
+  wasMoving?: boolean | null;
+
+  @Expose()
+  violationTimestamp?: Date;
 
   @Expose()
   status!: ViolationStatus;

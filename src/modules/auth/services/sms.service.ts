@@ -17,6 +17,7 @@ export class SMSService {
 
   private readonly verifyServiceSid: string;
 
+
   constructor(
     private readonly configService: ConfigService,
   ) {
@@ -32,6 +33,8 @@ export class SMSService {
     if (!accountSid || !authToken || !this.verifyServiceSid) {
       throw new Error('Twilio Verify configuration is missing');
     }
+
+    this.fromPhone = this.configService.get<string>('TWILIO_PHONE_NUMBER');
 
     this.twilioClient = twilio(accountSid, authToken);
   }
@@ -55,6 +58,20 @@ export class SMSService {
       );
 
       throw new BadRequestException('Failed to send OTP');
+    }
+  }
+
+  async sendMessage(to: string, body: string): Promise<void> {
+    if (!this.fromPhone) {
+      this.logger.warn('TWILIO_PHONE_NUMBER not configured — skipping SMS notification');
+      return;
+    }
+    try {
+      await this.twilioClient.messages.create({ to, from: this.fromPhone, body });
+      this.logger.log(`SMS sent to ${maskPhone(to)}`);
+    } catch (error) {
+      this.logger.error(`Failed to send SMS to ${maskPhone(to)}`, error instanceof Error ? error.stack : undefined);
+      throw error;
     }
   }
 

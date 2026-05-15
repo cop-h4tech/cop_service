@@ -82,7 +82,7 @@ export class SessionService {
     const expiresIn = Number.parseInt(process.env.ACCESS_TOKEN_TTL_SECONDS ?? '900', 10);
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
     const accessToken = sign(
-      { userId, email: userIdentifier },
+      { jti: randomBytes(16).toString('hex'), userId, email: userIdentifier },
       process.env.JWT_SECRET ?? 'change-me-in-production',
       { expiresIn },
     );
