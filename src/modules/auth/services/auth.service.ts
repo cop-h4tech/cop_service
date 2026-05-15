@@ -28,11 +28,16 @@ export class AuthService {
     private readonly smsService: SMSService,
   ) {}
 
-  async signUp(signUpDTO: SignUpDTO): Promise<{ message: string; email: string }> {
-    const existingUser = await this.userRepository.findOne({
-      where: [{ email: signUpDTO.email }, { phone: signUpDTO.phone }],
-    });
+  async signUp(signUpDTO: SignUpDTO): Promise<{ message: string; identifier: string }> {
+    if (!signUpDTO.email && !signUpDTO.phone) {
+      throw new BadRequestException('Either email or phone number is required');
+    }
 
+    const conditions: object[] = [];
+    if (signUpDTO.email) conditions.push({ email: signUpDTO.email });
+    if (signUpDTO.phone) conditions.push({ phone: signUpDTO.phone });
+
+    const existingUser = await this.userRepository.findOne({ where: conditions });
     if (existingUser) {
       throw new ConflictException('User with this email or phone already exists');
     }
@@ -51,91 +56,85 @@ export class AuthService {
 
     await this.userRepository.save(user);
 
-    const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.email);
-    await this.emailService.sendOTP(signUpDTO.email, emailOtp.code, OTPPurpose.SIGNUP);
+    if (signUpDTO.email) {
+      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.email);
+      await this.emailService.sendOTP(signUpDTO.email, emailOtp.code, OTPPurpose.SIGNUP);
+    }
 
-    try {
-      await this.smsService.sendOTP(signUpDTO.phone);
-    } catch (err) {
-      this.logger.warn(
-        `SMS OTP delivery failed for ${maskPhone(signUpDTO.phone)} — account created, user must request SMS OTP manually. Reason: ${err instanceof Error ? err.message : err}`,
-      );
+    if (signUpDTO.phone) {
+      await this.trySendSignupSMS(signUpDTO.phone);
+    }
+
+    let verifyInstructions: string;
+    if (signUpDTO.email && signUpDTO.phone) {
+      verifyInstructions = 'Please verify your email and phone with the OTPs sent.';
+    } else if (signUpDTO.email) {
+      verifyInstructions = 'Please verify your email with the OTP sent.';
+    } else {
+      verifyInstructions = 'Please verify your phone number with the OTP sent.';
     }
 
     return {
-      message: 'Sign up successful. Please verify your email and phone with the OTPs sent.',
-      email: signUpDTO.email,
+      message: `Sign up successful. ${verifyInstructions}`,
+      identifier: signUpDTO.email ?? signUpDTO.phone!,
     };
   }
 
-  async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; token?: string }> {
-    const user = await this.userRepository.findOne({ where: { email: loginDTO.email } });
+  async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; accessToken?: string; refreshToken?: string; expiresIn?: number }> {
+    if (!loginDTO.email && !loginDTO.phone) {
+      throw new BadRequestException('Either email or phone is required');
+    }
+
+    const where = loginDTO.email ? { email: loginDTO.email } : { phone: loginDTO.phone };
+    const user = await this.userRepository.findOne({ where });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email address');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isActive) {
-      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
-      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
-      try {
-        await this.smsService.sendOTP(user.phone);
-      } catch (err) {
-        this.logger.warn(
-          `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
-        );
-      }
+      await this.resendActivationOTPs(user);
       throw new ForbiddenException(
-        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+        'Account is not active. Please verify your registered contact to activate your account.',
       );
     }
 
     if (loginDTO.authMode === AuthMode.OTP) {
-      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNIN, user.email);
-      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNIN);
-
-      return { message: 'OTP sent to your registered email', authMode: AuthMode.OTP };
+      const phone = loginDTO.phone ?? user.phone;
+      if (!phone) {
+        throw new BadRequestException('No phone number on this account for OTP login');
+      }
+      return this.handleOTPLogin(phone);
     }
 
-    if (!loginDTO.password) {
-      throw new BadRequestException('Password is required for password authentication');
-    }
-
-    if (!user.password) {
-      throw new BadRequestException('No password set for this account. Please use OTP authentication.');
-    }
-
-    const isPasswordValid = await bcrypt.compare(loginDTO.password, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid password');
-    }
-
-    const session = await this.sessionService.createSession(user.id, user.email);
-    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, token: session.token };
+    return this.handlePasswordLogin(loginDTO, user);
   }
 
-  async verifyLoginOTP(email: string, otp: string): Promise<{ message: string; token: string }> {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async verifyLoginOTP(phone: string, otp: string): Promise<{ message: string; accessToken: string; refreshToken: string; expiresIn: number }> {
+    const user = await this.userRepository.findOne({ where: { phone } });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email address');
+      throw new UnauthorizedException('Invalid phone number');
     }
 
     if (!user.isActive) {
       throw new ForbiddenException(
-        'Account is not active. Please verify your email and phone number to activate your account by typing otp send to each.',
+        'Account is not active. Please verify your registered contact to activate your account.',
       );
     }
 
-    const isOTPValid = await this.otpService.verifyOTP(user, otp, OTPPurpose.SIGNIN);
+    const isOTPValid = await this.smsService.verifyOTP(phone, otp);
 
     if (!isOTPValid) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    const session = await this.sessionService.createSession(user.id, user.email);
-    return { message: 'Sign in successful', token: session.token };
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
+    return { message: 'Sign in successful', accessToken, refreshToken, expiresIn };
+  }
+
+  async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    return this.sessionService.refreshSession(refreshToken);
   }
 
   async logout(token: string): Promise<{ message: string }> {
@@ -157,7 +156,8 @@ export class AuthService {
     }
 
     user.emailVerified = true;
-    if (user.phoneVerified) {
+    // Activate if the user has no phone (email-only signup) or phone is already verified
+    if (!user.phone || user.phoneVerified) {
       user.isActive = true;
     }
     await this.userRepository.save(user);
@@ -183,7 +183,8 @@ export class AuthService {
     }
 
     user.phoneVerified = true;
-    if (user.emailVerified) {
+    // Activate if the user has no email (phone-only signup) or email is already verified
+    if (!user.email || user.emailVerified) {
       user.isActive = true;
     }
     await this.userRepository.save(user);
@@ -283,5 +284,62 @@ export class AuthService {
     await this.sessionService.revokeAllUserSessions(userId);
 
     return { message: 'Password changed successfully' };
+  }
+
+  private async resendActivationOTPs(user: UserEntity): Promise<void> {
+    if (user.email) {
+      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
+      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
+    }
+    if (user.phone) {
+      try {
+        await this.smsService.sendOTP(user.phone);
+      } catch (err) {
+        this.logger.warn(
+          `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+  }
+
+  private async handleOTPLogin(phone: string): Promise<{ message: string; authMode: AuthMode }> {
+    try {
+      await this.smsService.sendOTP(phone);
+    } catch (err) {
+      this.logger.error(
+        `SMS OTP send failed for ${maskPhone(phone)} during OTP login. Reason: ${err instanceof Error ? err.message : err}`,
+      );
+      throw new BadRequestException('Failed to send OTP to your phone number');
+    }
+    return { message: 'OTP sent to your registered phone number', authMode: AuthMode.OTP };
+  }
+
+  private async handlePasswordLogin(
+    loginDTO: LoginDTO,
+    user: UserEntity,
+  ): Promise<{ message: string; authMode: AuthMode; accessToken: string; refreshToken: string; expiresIn: number }> {
+    if (!loginDTO.password) {
+      throw new BadRequestException('Password is required for password authentication');
+    }
+    if (!user.password) {
+      throw new BadRequestException('No password set for this account. Please use OTP authentication.');
+    }
+    const isPasswordValid = await bcrypt.compare(loginDTO.password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
+    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, accessToken, refreshToken, expiresIn };
+  }
+
+  private async trySendSignupSMS(phone: string): Promise<void> {
+    try {
+      await this.smsService.sendOTP(phone);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `SMS OTP delivery failed for ${maskPhone(phone)} — account created, user must request SMS OTP manually. Reason: ${reason}`,
+      );
+    }
   }
 }

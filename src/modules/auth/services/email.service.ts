@@ -21,6 +21,34 @@ export class EmailService {
     });
   }
 
+  async sendViolationConfirmation(to: string, ticketNumber: string): Promise<void> {
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:8px;">
+        <h2 style="color:#1d4ed8;margin-bottom:8px;">Citizen On Petrol</h2>
+        <p style="color:#374151;">Your violation has been successfully submitted.</p>
+        <div style="background:#f3f4f6;border-radius:6px;padding:16px 24px;margin:16px 0;text-align:center;">
+          <span style="font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;">Ticket Number</span><br/>
+          <span style="font-size:22px;font-weight:bold;color:#1d4ed8;">${ticketNumber}</span>
+        </div>
+        <p style="color:#374151;">Thank you for your public engagement! If the violation is paid you will receive <strong>25% of the ticket payment</strong>.</p>
+        <p style="color:#6b7280;font-size:13px;">Keep your ticket number for tracking purposes.</p>
+      </div>
+    `;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Citizen On Petrol" <${this.configService.get<string>('MAIL_USER')}>`,
+        to,
+        subject: `Violation Submitted – Ticket ${ticketNumber}`,
+        html,
+      });
+      this.logger.log(`Violation confirmation email sent to ${maskEmail(to)}`);
+    } catch (error) {
+      this.logger.error(`Failed to send violation confirmation to ${maskEmail(to)}`, error);
+      throw error;
+    }
+  }
+
   async sendOTP(to: string, otp: string, purpose: string): Promise<void> {
     const subject = this.getSubject(purpose);
     const html = this.buildOtpEmail(otp, purpose);

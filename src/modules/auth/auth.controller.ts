@@ -40,11 +40,11 @@ export class AuthController {
 
     /**
      * POST /auth/login/otp
-     * Step 2 of OTP login — submit the OTP received by email.
+     * Step 2 of OTP login — submit the SMS OTP received on the registered phone.
      */
     @Post('login/otp')
-    async verifyLoginOTP(@Body() body: { email: string; code: string }) {
-        return this.authService.verifyLoginOTP(body.email, body.code);
+    async verifyLoginOTP(@Body() dto: VerifySMSOTPDTO) {
+        return this.authService.verifyLoginOTP(dto.phone, dto.code);
     }
 
     /**
@@ -82,6 +82,15 @@ export class AuthController {
     @Post('verify/resend-email-otp')
     async resendEmailOTP(@Body() dto: ResendEmailOTPDTO) {
         return this.authService.resendEmailOTP(dto.email);
+    }
+
+    /**
+     * POST /auth/refresh
+     * Exchange a valid refresh token for a new access + refresh token pair (rotation).
+     */
+    @Post('refresh')
+    async refresh(@Body() body: { refreshToken: string }) {
+        return this.authService.refresh(body.refreshToken);
     }
 
     /**

@@ -3,8 +3,7 @@ FROM node:20-bookworm-slim AS dev
 WORKDIR /app
 COPY package.json ./
 RUN if [ -f package-lock.json ]; then npm ci --legacy-peer-deps; else npm install --legacy-peer-deps; fi
-COPY nest-cli.json tsconfig*.json ./
-COPY src ./src
+COPY . .
 
 FROM dev AS builder
 
