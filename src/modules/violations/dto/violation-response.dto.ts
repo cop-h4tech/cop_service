@@ -1,5 +1,9 @@
 import { Expose, Transform } from 'class-transformer';
-import { MediaType, ViolationStatus, ViolationType } from '../entities/violation.entity';
+import {
+  MediaType,
+  ViolationStatus,
+  ViolationType,
+} from '../entities/violation.entity';
 
 export class ViolationResponseDto {
   @Expose()

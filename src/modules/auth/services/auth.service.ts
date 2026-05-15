@@ -1,4 +1,12 @@
-import { Injectable, BadRequestException, UnauthorizedException, ConflictException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -6,7 +14,10 @@ import { UserEntity } from '../entities/user.entity';
 import { SignUpDTO } from '../dto/sign-up.dto';
 import { LoginDTO, AuthMode } from '../dto/sign-in.dto';
 import { VerifyEmailOTPDTO } from '../dto/verify-otp.dto';
-import { ResetPasswordRequestDTO, ResetPasswordDTO } from '../dto/reset-password.dto';
+import {
+  ResetPasswordRequestDTO,
+  ResetPasswordDTO,
+} from '../dto/reset-password.dto';
 import { ChangePasswordDTO } from '../dto/change-password.dto';
 import { OTPService } from './otp.service';
 import { EmailService } from './email.service';
@@ -28,7 +39,9 @@ export class AuthService {
     private readonly smsService: SMSService,
   ) {}
 
-  async signUp(signUpDTO: SignUpDTO): Promise<{ message: string; identifier: string }> {
+  async signUp(
+    signUpDTO: SignUpDTO,
+  ): Promise<{ message: string; identifier: string }> {
     if (!signUpDTO.email && !signUpDTO.phone) {
       throw new BadRequestException('Either email or phone number is required');
     }
@@ -37,9 +50,13 @@ export class AuthService {
     if (signUpDTO.email) conditions.push({ email: signUpDTO.email });
     if (signUpDTO.phone) conditions.push({ phone: signUpDTO.phone });
 
-    const existingUser = await this.userRepository.findOne({ where: conditions });
+    const existingUser = await this.userRepository.findOne({
+      where: conditions,
+    });
     if (existingUser) {
-      throw new ConflictException('User with this email or phone already exists');
+      throw new ConflictException(
+        'User with this email or phone already exists',
+      );
     }
 
     const user = this.userRepository.create({
@@ -57,8 +74,16 @@ export class AuthService {
     await this.userRepository.save(user);
 
     if (signUpDTO.email) {
-      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, signUpDTO.email);
-      await this.emailService.sendOTP(signUpDTO.email, emailOtp.code, OTPPurpose.SIGNUP);
+      const emailOtp = await this.otpService.createOTP(
+        user,
+        OTPPurpose.SIGNUP,
+        signUpDTO.email,
+      );
+      await this.emailService.sendOTP(
+        signUpDTO.email,
+        emailOtp.code,
+        OTPPurpose.SIGNUP,
+      );
     }
 
     if (signUpDTO.phone) {
@@ -67,7 +92,8 @@ export class AuthService {
 
     let verifyInstructions: string;
     if (signUpDTO.email && signUpDTO.phone) {
-      verifyInstructions = 'Please verify your email and phone with the OTPs sent.';
+      verifyInstructions =
+        'Please verify your email and phone with the OTPs sent.';
     } else if (signUpDTO.email) {
       verifyInstructions = 'Please verify your email with the OTP sent.';
     } else {
@@ -80,12 +106,20 @@ export class AuthService {
     };
   }
 
-  async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; accessToken?: string; refreshToken?: string; expiresIn?: number }> {
+  async login(loginDTO: LoginDTO): Promise<{
+    message: string;
+    authMode: AuthMode;
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: number;
+  }> {
     if (!loginDTO.email && !loginDTO.phone) {
       throw new BadRequestException('Either email or phone is required');
     }
 
-    const where = loginDTO.email ? { email: loginDTO.email } : { phone: loginDTO.phone };
+    const where = loginDTO.email
+      ? { email: loginDTO.email }
+      : { phone: loginDTO.phone };
     const user = await this.userRepository.findOne({ where });
 
     if (!user) {
@@ -102,7 +136,9 @@ export class AuthService {
     if (loginDTO.authMode === AuthMode.OTP) {
       const phone = loginDTO.phone ?? user.phone;
       if (!phone) {
-        throw new BadRequestException('No phone number on this account for OTP login');
+        throw new BadRequestException(
+          'No phone number on this account for OTP login',
+        );
       }
       return this.handleOTPLogin(phone);
     }
@@ -110,7 +146,15 @@ export class AuthService {
     return this.handlePasswordLogin(loginDTO, user);
   }
 
-  async verifyLoginOTP(phone: string, otp: string): Promise<{ message: string; accessToken: string; refreshToken: string; expiresIn: number }> {
+  async verifyLoginOTP(
+    phone: string,
+    otp: string,
+  ): Promise<{
+    message: string;
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  }> {
     const user = await this.userRepository.findOne({ where: { phone } });
 
     if (!user) {
@@ -129,11 +173,22 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
-    return { message: 'Sign in successful', accessToken, refreshToken, expiresIn };
+    const { accessToken, refreshToken, expiresIn } =
+      await this.sessionService.createSession(
+        user.id,
+        user.email ?? user.phone ?? user.id,
+      );
+    return {
+      message: 'Sign in successful',
+      accessToken,
+      refreshToken,
+      expiresIn,
+    };
   }
 
-  async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+  async refresh(
+    refreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
     return this.sessionService.refreshSession(refreshToken);
   }
 
@@ -142,14 +197,22 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
-  async verifyEmailOTP(verifyOTPDTO: VerifyEmailOTPDTO): Promise<{ message: string }> {
-    const user = await this.userRepository.findOne({ where: { email: verifyOTPDTO.email } });
+  async verifyEmailOTP(
+    verifyOTPDTO: VerifyEmailOTPDTO,
+  ): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({
+      where: { email: verifyOTPDTO.email },
+    });
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    const isOTPValid = await this.otpService.verifyOTP(user, verifyOTPDTO.code, OTPPurpose.SIGNUP);
+    const isOTPValid = await this.otpService.verifyOTP(
+      user,
+      verifyOTPDTO.code,
+      OTPPurpose.SIGNUP,
+    );
 
     if (!isOTPValid) {
       throw new UnauthorizedException('Invalid or expired OTP');
@@ -169,7 +232,10 @@ export class AuthService {
     };
   }
 
-  async verifySMSOTP(phone: string, code: string): Promise<{ message: string }> {
+  async verifySMSOTP(
+    phone: string,
+    code: string,
+  ): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({ where: { phone } });
 
     if (!user) {
@@ -224,8 +290,12 @@ export class AuthService {
     return { message: 'Verification OTP resent to your email' };
   }
 
-  async requestPasswordReset(dto: ResetPasswordRequestDTO): Promise<{ message: string }> {
-    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+  async requestPasswordReset(
+    dto: ResetPasswordRequestDTO,
+  ): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
 
     if (!user) {
       throw new UnauthorizedException('Invalid email address');
@@ -237,20 +307,34 @@ export class AuthService {
       );
     }
 
-    const otp = await this.otpService.createOTP(user, OTPPurpose.PASSWORD_RESET, dto.email);
-    await this.emailService.sendOTP(dto.email, otp.code, OTPPurpose.PASSWORD_RESET);
+    const otp = await this.otpService.createOTP(
+      user,
+      OTPPurpose.PASSWORD_RESET,
+      dto.email,
+    );
+    await this.emailService.sendOTP(
+      dto.email,
+      otp.code,
+      OTPPurpose.PASSWORD_RESET,
+    );
 
     return { message: 'Password reset OTP sent to your registered email' };
   }
 
   async resetPassword(dto: ResetPasswordDTO): Promise<{ message: string }> {
-    const user = await this.userRepository.findOne({ where: { email: dto.email } });
+    const user = await this.userRepository.findOne({
+      where: { email: dto.email },
+    });
 
     if (!user) {
       throw new UnauthorizedException('Invalid email address');
     }
 
-    const isOTPValid = await this.otpService.verifyOTP(user, dto.code, OTPPurpose.PASSWORD_RESET);
+    const isOTPValid = await this.otpService.verifyOTP(
+      user,
+      dto.code,
+      OTPPurpose.PASSWORD_RESET,
+    );
 
     if (!isOTPValid) {
       throw new UnauthorizedException('Invalid or expired OTP');
@@ -262,7 +346,10 @@ export class AuthService {
     return { message: 'Password reset successfully. You can now sign in.' };
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDTO): Promise<{ message: string }> {
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDTO,
+  ): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
@@ -270,10 +357,15 @@ export class AuthService {
     }
 
     if (!user.password) {
-      throw new BadRequestException('No password set for this account. Please use OTP authentication.');
+      throw new BadRequestException(
+        'No password set for this account. Please use OTP authentication.',
+      );
     }
 
-    const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, user.password);
+    const isCurrentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      user.password,
+    );
 
     if (!isCurrentPasswordValid) {
       throw new UnauthorizedException('Current password is incorrect');
@@ -288,8 +380,16 @@ export class AuthService {
 
   private async resendActivationOTPs(user: UserEntity): Promise<void> {
     if (user.email) {
-      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
-      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
+      const emailOtp = await this.otpService.createOTP(
+        user,
+        OTPPurpose.SIGNUP,
+        user.email,
+      );
+      await this.emailService.sendOTP(
+        user.email,
+        emailOtp.code,
+        OTPPurpose.SIGNUP,
+      );
     }
     if (user.phone) {
       try {
@@ -302,7 +402,9 @@ export class AuthService {
     }
   }
 
-  private async handleOTPLogin(phone: string): Promise<{ message: string; authMode: AuthMode }> {
+  private async handleOTPLogin(
+    phone: string,
+  ): Promise<{ message: string; authMode: AuthMode }> {
     try {
       await this.smsService.sendOTP(phone);
     } catch (err) {
@@ -311,25 +413,51 @@ export class AuthService {
       );
       throw new BadRequestException('Failed to send OTP to your phone number');
     }
-    return { message: 'OTP sent to your registered phone number', authMode: AuthMode.OTP };
+    return {
+      message: 'OTP sent to your registered phone number',
+      authMode: AuthMode.OTP,
+    };
   }
 
   private async handlePasswordLogin(
     loginDTO: LoginDTO,
     user: UserEntity,
-  ): Promise<{ message: string; authMode: AuthMode; accessToken: string; refreshToken: string; expiresIn: number }> {
+  ): Promise<{
+    message: string;
+    authMode: AuthMode;
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  }> {
     if (!loginDTO.password) {
-      throw new BadRequestException('Password is required for password authentication');
+      throw new BadRequestException(
+        'Password is required for password authentication',
+      );
     }
     if (!user.password) {
-      throw new BadRequestException('No password set for this account. Please use OTP authentication.');
+      throw new BadRequestException(
+        'No password set for this account. Please use OTP authentication.',
+      );
     }
-    const isPasswordValid = await bcrypt.compare(loginDTO.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginDTO.password,
+      user.password,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid password');
     }
-    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
-    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, accessToken, refreshToken, expiresIn };
+    const { accessToken, refreshToken, expiresIn } =
+      await this.sessionService.createSession(
+        user.id,
+        user.email ?? user.phone ?? user.id,
+      );
+    return {
+      message: 'Sign in successful',
+      authMode: AuthMode.PASSWORD,
+      accessToken,
+      refreshToken,
+      expiresIn,
+    };
   }
 
   private async trySendSignupSMS(phone: string): Promise<void> {

@@ -59,16 +59,22 @@ export class ViolationsController {
     const videos = files.filter((f) => VIDEO_MIMES.has(f.mimetype));
 
     if (photos.length > PHOTO_MAX_COUNT) {
-      throw new BadRequestException(`Maximum ${PHOTO_MAX_COUNT} photos per submission`);
+      throw new BadRequestException(
+        `Maximum ${PHOTO_MAX_COUNT} photos per submission`,
+      );
     }
 
     if (videos.length > VIDEO_MAX_COUNT) {
-      throw new BadRequestException(`Maximum ${VIDEO_MAX_COUNT} videos per submission`);
+      throw new BadRequestException(
+        `Maximum ${VIDEO_MAX_COUNT} videos per submission`,
+      );
     }
 
     const oversized = photos.find((f) => f.size > PHOTO_MAX_BYTES);
     if (oversized) {
-      throw new BadRequestException(`Photo "${oversized.originalname}" exceeds the 10 MB limit`);
+      throw new BadRequestException(
+        `Photo "${oversized.originalname}" exceeds the 10 MB limit`,
+      );
     }
 
     return this.violationsService.submit(user.userId, dto, files);

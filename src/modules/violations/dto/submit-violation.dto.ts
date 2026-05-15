@@ -53,7 +53,9 @@ export class SubmitViolationDto {
   @IsEnum(ViolationType)
   violationType!: ViolationType;
 
-  @ValidateIf((o: SubmitViolationDto) => o.violationType === ViolationType.NO_SEATBELT)
+  @ValidateIf(
+    (o: SubmitViolationDto) => o.violationType === ViolationType.NO_SEATBELT,
+  )
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   wasMoving?: boolean;

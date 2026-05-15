@@ -1,12 +1,20 @@
-import { IsEmail, IsPhoneNumber, IsString, MinLength, IsOptional, Matches, ValidateIf } from 'class-validator';
+import {
+  IsEmail,
+  IsPhoneNumber,
+  IsString,
+  MinLength,
+  IsOptional,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 import { Match } from '../decorators/match.decorator';
 
 export class SignUpDTO {
-  @ValidateIf(o => !o.phone)
+  @ValidateIf((o) => !o.phone)
   @IsEmail()
   email?: string;
 
-  @ValidateIf(o => !o.email)
+  @ValidateIf((o) => !o.email)
   @IsPhoneNumber()
   phone?: string;
 
@@ -34,7 +42,7 @@ export class SignUpDTO {
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   password?: string;
 
-  @ValidateIf(o => o.password !== undefined)
+  @ValidateIf((o) => o.password !== undefined)
   @IsString()
   @Match('password', { message: 'Passwords do not match' })
   confirmPassword?: string;

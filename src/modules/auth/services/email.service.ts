@@ -21,7 +21,10 @@ export class EmailService {
     });
   }
 
-  async sendViolationConfirmation(to: string, ticketNumber: string): Promise<void> {
+  async sendViolationConfirmation(
+    to: string,
+    ticketNumber: string,
+  ): Promise<void> {
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e5e7eb;border-radius:8px;">
         <h2 style="color:#1d4ed8;margin-bottom:8px;">Citizen On Petrol</h2>
@@ -44,7 +47,10 @@ export class EmailService {
       });
       this.logger.log(`Violation confirmation email sent to ${maskEmail(to)}`);
     } catch (error) {
-      this.logger.error(`Failed to send violation confirmation to ${maskEmail(to)}`, error);
+      this.logger.error(
+        `Failed to send violation confirmation to ${maskEmail(to)}`,
+        error,
+      );
       throw error;
     }
   }

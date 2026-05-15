@@ -18,8 +18,14 @@ export class SessionService {
     private readonly sessionRepository: Repository<SessionEntity>,
   ) {}
 
-  async createSession(userId: string, userIdentifier: string): Promise<TokenPair> {
-    const { accessToken, expiresAt, expiresIn } = this.buildAccessToken(userId, userIdentifier);
+  async createSession(
+    userId: string,
+    userIdentifier: string,
+  ): Promise<TokenPair> {
+    const { accessToken, expiresAt, expiresIn } = this.buildAccessToken(
+      userId,
+      userIdentifier,
+    );
     const { refreshToken, refreshTokenExpiresAt } = this.buildRefreshToken();
 
     const session = this.sessionRepository.create({
@@ -36,18 +42,29 @@ export class SessionService {
   }
 
   async refreshSession(refreshToken: string): Promise<TokenPair> {
-    const session = await this.sessionRepository.findOne({ where: { refreshToken } });
+    const session = await this.sessionRepository.findOne({
+      where: { refreshToken },
+    });
 
     if (!session || session.isRevoked) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (session.refreshTokenExpiresAt && session.refreshTokenExpiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token expired, please sign in again');
+    if (
+      session.refreshTokenExpiresAt &&
+      session.refreshTokenExpiresAt < new Date()
+    ) {
+      throw new UnauthorizedException(
+        'Refresh token expired, please sign in again',
+      );
     }
 
-    const { accessToken, expiresAt, expiresIn } = this.buildAccessToken(session.userId, session.userIdentifier);
-    const { refreshToken: newRefreshToken, refreshTokenExpiresAt } = this.buildRefreshToken();
+    const { accessToken, expiresAt, expiresIn } = this.buildAccessToken(
+      session.userId,
+      session.userIdentifier,
+    );
+    const { refreshToken: newRefreshToken, refreshTokenExpiresAt } =
+      this.buildRefreshToken();
 
     session.token = accessToken;
     session.expiresAt = expiresAt;
@@ -60,7 +77,11 @@ export class SessionService {
 
   async validateSession(token: string): Promise<void> {
     const session = await this.sessionRepository.findOne({ where: { token } });
-    if (!session || session.isRevoked || (session.expiresAt !== null && session.expiresAt < new Date())) {
+    if (
+      !session ||
+      session.isRevoked ||
+      (session.expiresAt !== null && session.expiresAt < new Date())
+    ) {
       throw new UnauthorizedException('Invalid or expired session');
     }
   }
@@ -75,11 +96,20 @@ export class SessionService {
   }
 
   async revokeAllUserSessions(userId: string): Promise<void> {
-    await this.sessionRepository.update({ userId, isRevoked: false }, { isRevoked: true });
+    await this.sessionRepository.update(
+      { userId, isRevoked: false },
+      { isRevoked: true },
+    );
   }
 
-  private buildAccessToken(userId: string, userIdentifier: string): { accessToken: string; expiresAt: Date; expiresIn: number } {
-    const expiresIn = Number.parseInt(process.env.ACCESS_TOKEN_TTL_SECONDS ?? '900', 10);
+  private buildAccessToken(
+    userId: string,
+    userIdentifier: string,
+  ): { accessToken: string; expiresAt: Date; expiresIn: number } {
+    const expiresIn = Number.parseInt(
+      process.env.ACCESS_TOKEN_TTL_SECONDS ?? '900',
+      10,
+    );
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
     const accessToken = sign(
       { jti: randomBytes(16).toString('hex'), userId, email: userIdentifier },
@@ -89,10 +119,18 @@ export class SessionService {
     return { accessToken, expiresAt, expiresIn };
   }
 
-  private buildRefreshToken(): { refreshToken: string; refreshTokenExpiresAt: Date } {
-    const ttlDays = Number.parseInt(process.env.REFRESH_TOKEN_TTL_DAYS ?? '90', 10);
+  private buildRefreshToken(): {
+    refreshToken: string;
+    refreshTokenExpiresAt: Date;
+  } {
+    const ttlDays = Number.parseInt(
+      process.env.REFRESH_TOKEN_TTL_DAYS ?? '90',
+      10,
+    );
     const refreshToken = randomBytes(32).toString('hex');
-    const refreshTokenExpiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+    const refreshTokenExpiresAt = new Date(
+      Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+    );
     return { refreshToken, refreshTokenExpiresAt };
   }
 }

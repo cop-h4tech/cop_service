@@ -1,6 +1,7 @@
 import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
 import { UserService } from './services/user.service';
 import { UpdateProfileDTO } from './dto/update-profile.dto';
+import { PaymentInfoEntity } from './entities/payment-info.entity';
 import { AuthGuard } from './guards/auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -25,7 +26,7 @@ export class UserController {
   @Patch('payment-info')
   async updatePaymentInfo(
     @CurrentUser() user: { userId: string },
-    @Body() paymentData: any,
+    @Body() paymentData: Partial<PaymentInfoEntity>,
   ) {
     return this.userService.updatePaymentInfo(user.userId, paymentData);
   }

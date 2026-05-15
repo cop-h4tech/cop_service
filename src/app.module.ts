@@ -34,4 +34,3 @@ import { entities } from './entities';
   ],
 })
 export class AppModule {}
-

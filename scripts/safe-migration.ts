@@ -13,7 +13,7 @@ function getMigrationFiles(): string[] {
 function extractUpSql(content: string): string[] {
   const upBlock = content.match(/public async up[\s\S]*?(?=public async down)/);
   if (!upBlock) return [];
-  const hits = [...upBlock[0].matchAll(/queryRunner\.query\(`([\s\S]*?)`\)/g)];
+  const hits = [...upBlock[0].matchAll(/queryRunner\.query\(\s*`([\s\S]*?)`\s*,?\s*\)/g)];
   return hits.map((m) => m[1].trim());
 }
 

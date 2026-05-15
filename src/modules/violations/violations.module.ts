@@ -7,7 +7,10 @@ import { AuthModule } from '../auth/auth.module';
 import { UserEntity } from '../auth/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ViolationEntity, UserEntity]), AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([ViolationEntity, UserEntity]),
+    AuthModule,
+  ],
   controllers: [ViolationsController],
   providers: [ViolationsService],
 })
