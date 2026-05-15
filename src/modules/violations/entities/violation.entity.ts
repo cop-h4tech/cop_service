@@ -38,7 +38,10 @@ export enum ParkingViolationType {
 }
 
 // Combined enum for DB column definition and validation
-export const ViolationType = { ...MovingViolationType, ...ParkingViolationType } as const;
+export const ViolationType = {
+  ...MovingViolationType,
+  ...ParkingViolationType,
+} as const;
 export type ViolationType = MovingViolationType | ParkingViolationType;
 
 export enum ViolationStatus {

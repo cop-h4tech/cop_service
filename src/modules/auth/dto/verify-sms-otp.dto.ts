@@ -1,9 +1,4 @@
-
-import {
-  IsPhoneNumber,
-  IsString,
-  Length,
-} from 'class-validator';
+import { IsPhoneNumber, IsString, Length } from 'class-validator';
 
 export class VerifySMSOTPDTO {
   @IsPhoneNumber()

@@ -14,9 +14,14 @@ import { UserEntity } from '../auth/entities/user.entity';
 import { EmailService } from '../auth/services/email.service';
 import { SMSService } from '../auth/services/sms.service';
 import { PHOTO_MIMES } from './violations.constants';
+import { PaginationQueryDTO } from '../../common/dto/pagination-query.dto';
+import { PaginatedResponseDTO } from '../../common/dto/paginated-response.dto';
 
 function utcCompact(): string {
-  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  return new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d+Z$/, 'Z');
 }
 
 @Injectable()
@@ -32,15 +37,20 @@ export class ViolationsService {
     private readonly emailService: EmailService,
     private readonly smsService: SMSService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   private generateTicketNumber(): string {
     const datePart = new Date().toISOString().slice(0, 10).replaceAll('-', '');
-    const hexSuffix = randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase();
+    const hexSuffix = randomUUID()
+      .replaceAll('-', '')
+      .slice(0, 8)
+      .toUpperCase();
     return `VIO-${datePart}-${hexSuffix}`;
   }
 
-  private async toResponse(entity: ViolationEntity): Promise<ViolationResponseDto> {
+  private async toResponse(
+    entity: ViolationEntity,
+  ): Promise<ViolationResponseDto> {
     const dto = plainToInstance(ViolationResponseDto, entity, {
       excludeExtraneousValues: true,
     });
@@ -92,42 +102,61 @@ export class ViolationsService {
       longitude: dto.longitude,
       violationType: dto.violationType,
       wasMoving: dto.wasMoving ?? null,
-      violationTimestamp: dto.violationTimestamp ? new Date(dto.violationTimestamp) : undefined,
+      violationTimestamp: dto.violationTimestamp
+        ? new Date(dto.violationTimestamp)
+        : undefined,
     });
 
     const saved = await this.violationRepository.save(violation);
 
     if (user) {
-      this.sendSubmissionNotifications(user, saved.ticketNumber).catch((err: unknown) =>
-        this.logger.error('Violation notification failed', err),
+      this.sendSubmissionNotifications(user, saved.ticketNumber).catch(
+        (err: unknown) =>
+          this.logger.error('Violation notification failed', err),
       );
     }
 
     return this.toResponse(saved);
   }
 
-  async findAllByUser(userId: string): Promise<ViolationResponseDto[]> {
-    const violations = await this.violationRepository.find({
+  async findAllByUser(
+    userId: string,
+    query: PaginationQueryDTO,
+  ): Promise<PaginatedResponseDTO<ViolationResponseDto>> {
+    const { page, limit } = query;
+    const [violations, total] = await this.violationRepository.findAndCount({
       where: { userId },
-      order: { createdAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
+      take: limit,
+      skip: (page - 1) * limit,
     });
-    return Promise.all(violations.map((v) => this.toResponse(v)));
+    const data = await Promise.all(violations.map((v) => this.toResponse(v)));
+    return new PaginatedResponseDTO(data, total, page, limit);
   }
 
-  private async sendSubmissionNotifications(user: UserEntity, ticketNumber: string): Promise<void> {
+  private async sendSubmissionNotifications(
+    user: UserEntity,
+    ticketNumber: string,
+  ): Promise<void> {
     const message =
       `Your violation has been submitted (Ticket: ${ticketNumber}). ` +
       `Thank you for your public engagement! If the violation is paid you will receive 25% of the ticket payment.`;
 
     if (user.email) {
-      await this.emailService.sendViolationConfirmation(user.email, ticketNumber);
+      await this.emailService.sendViolationConfirmation(
+        user.email,
+        ticketNumber,
+      );
     }
     if (user.phone) {
       await this.smsService.sendMessage(user.phone, message);
     }
   }
 
-  async findOneByUser(id: string, userId: string): Promise<ViolationResponseDto> {
+  async findOneByUser(
+    id: string,
+    userId: string,
+  ): Promise<ViolationResponseDto> {
     const violation = await this.violationRepository.findOne({
       where: { id, userId },
     });

@@ -16,12 +16,14 @@ export class S3Service {
   constructor() {
     this.bucket = process.env.S3_BUCKET ?? 'cop-violations';
 
+    const endpoint = process.env.S3_ENDPOINT;
     this.client = new S3Client({
       region: process.env.S3_REGION ?? 'us-east-1',
       credentials: {
         accessKeyId: process.env.S3_ACCESS_KEY ?? '',
         secretAccessKey: process.env.S3_SECRET_KEY ?? '',
       },
+      ...(endpoint && { endpoint, forcePathStyle: true }),
     });
   }
 

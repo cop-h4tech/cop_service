@@ -1,6 +1,6 @@
 # NestJS Project Standards
 
-This document outlines the naming conventions and project structure standards for NestJS applications.
+This document outlines the naming conventions, project structure standards, and API design rules for NestJS applications.
 
 ## Project Structure
 
@@ -27,7 +27,10 @@ src/
 │   ├── guards/
 │   ├── interceptors/
 │   ├── filters/
-│   └── pipes/
+│   ├── pipes/
+│   └── dto/
+│       ├── pagination-query.dto.ts
+│       └── paginated-response.dto.ts
 ├── config/
 │   └── configuration.ts
 ├── shared/
@@ -74,6 +77,7 @@ src/
 - Use **UPPER_SNAKE_CASE** for constants
 - `const MAX_RETRY_ATTEMPTS = 3;`
 - `const DEFAULT_PAGE_SIZE = 10;`
+- `const MAX_PAGE_SIZE = 100;`
 
 ### Routes and Endpoints
 - Use **kebab-case** for route paths
@@ -118,6 +122,70 @@ user!: UserEntity;
 // Wrong — TypeORM will create column "firstname" (lowercased camelCase)
 @Column({ type: 'varchar' })
 firstName!: string;
+```
+
+## Pagination Standards
+
+**Rule: Every GET endpoint that returns a list must be paginated.**
+
+- Accept `page` (default: `1`, min: `1`) and `limit` (default: `10`, min: `1`, max: `100`) as query parameters.
+- Use the shared `PaginationQueryDTO` from `src/common/dto/pagination-query.dto.ts` for input validation.
+- Wrap the response in `PaginatedResponseDTO<T>` from `src/common/dto/paginated-response.dto.ts`.
+- Always order list results by `updatedAt DESC` (latest-updated first).
+- Place pagination constants `DEFAULT_PAGE_SIZE = 10` and `MAX_PAGE_SIZE = 100` in the module's `*.constants.ts`.
+
+### Response Shape
+
+```json
+{
+  "data": [...],
+  "total": 100,
+  "page": 1,
+  "limit": 10,
+  "totalPages": 10
+}
+```
+
+### PaginationQueryDTO
+
+```typescript
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
+
+export class PaginationQueryDTO {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit: number = 10;
+}
+```
+
+### PaginatedResponseDTO
+
+```typescript
+export class PaginatedResponseDTO<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+
+  constructor(data: T[], total: number, page: number, limit: number) {
+    this.data = data;
+    this.total = total;
+    this.page = page;
+    this.limit = limit;
+    this.totalPages = Math.ceil(total / limit);
+  }
+}
 ```
 
 ## Code Organization
@@ -176,9 +244,10 @@ export class FeatureModule {}
 
 ### Controller
 ```typescript
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { FeatureService } from './feature.service';
 import { CreateFeatureDTO } from './dto/create-feature.dto';
+import { PaginationQueryDTO } from '../../common/dto/pagination-query.dto';
 
 @Controller('features')
 export class FeatureController {
@@ -190,13 +259,13 @@ export class FeatureController {
   }
 
   @Get()
-  findAll() {
-    return this.featureService.findAll();
+  findAll(@Query() query: PaginationQueryDTO) {
+    return this.featureService.findAll(query);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.featureService.findOne(+id);
+    return this.featureService.findOne(id);
   }
 }
 ```
@@ -204,28 +273,43 @@ export class FeatureController {
 ### Service
 ```typescript
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateFeatureDTO } from './dto/create-feature.dto';
-import { UpdateFeatureDTO } from './dto/update-feature.dto';
+import { PaginationQueryDTO } from '../../common/dto/pagination-query.dto';
+import { PaginatedResponseDTO } from '../../common/dto/paginated-response.dto';
+import { FeatureEntity } from './entities/feature.entity';
 
 @Injectable()
 export class FeatureService {
+  constructor(
+    @InjectRepository(FeatureEntity)
+    private readonly featureRepository: Repository<FeatureEntity>,
+  ) {}
+
   create(createFeatureDTO: CreateFeatureDTO) {
     // Implementation
   }
 
-  findAll() {
+  async findAll(query: PaginationQueryDTO): Promise<PaginatedResponseDTO<FeatureEntity>> {
+    const { page, limit } = query;
+    const [data, total] = await this.featureRepository.findAndCount({
+      order: { updatedAt: 'DESC' },
+      take: limit,
+      skip: (page - 1) * limit,
+    });
+    return new PaginatedResponseDTO(data, total, page, limit);
+  }
+
+  findOne(id: string) {
     // Implementation
   }
 
-  findOne(id: number) {
+  update(id: string, updateFeatureDTO: CreateFeatureDTO) {
     // Implementation
   }
 
-  update(id: number, updateFeatureDTO: UpdateFeatureDTO) {
-    // Implementation
-  }
-
-  remove(id: number) {
+  remove(id: string) {
     // Implementation
   }
 }

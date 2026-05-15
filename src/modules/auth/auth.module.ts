@@ -15,9 +15,31 @@ import { PaymentInfoEntity } from './entities/payment-info.entity';
 import { SessionEntity } from './entities/session.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, OtpEntity, PaymentInfoEntity, SessionEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      UserEntity,
+      OtpEntity,
+      PaymentInfoEntity,
+      SessionEntity,
+    ]),
+  ],
   controllers: [AuthController, UserController],
-  providers: [AuthService, OTPService, UserService, EmailService, SMSService, SessionService, AuthGuard],
-  exports: [AuthService, UserService, AuthGuard, SessionService, EmailService, SMSService],
+  providers: [
+    AuthService,
+    OTPService,
+    UserService,
+    EmailService,
+    SMSService,
+    SessionService,
+    AuthGuard,
+  ],
+  exports: [
+    AuthService,
+    UserService,
+    AuthGuard,
+    SessionService,
+    EmailService,
+    SMSService,
+  ],
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 import { ConfigService } from '@nestjs/config';
 
@@ -19,23 +15,22 @@ export class SMSService {
 
   private readonly messagingServiceSid: string | undefined;
 
-  constructor(
-    private readonly configService: ConfigService,
-  ) {
-    const accountSid =
-      this.configService.get<string>('TWILIO_ACCOUNT_SID');
+  constructor(private readonly configService: ConfigService) {
+    const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
 
-    const authToken =
-      this.configService.get<string>('TWILIO_AUTH_TOKEN');
+    const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
 
-    this.verifyServiceSid =
-      this.configService.get<string>('TWILIO_VERIFY_SERVICE_SID') as string;
+    this.verifyServiceSid = this.configService.get<string>(
+      'TWILIO_VERIFY_SERVICE_SID',
+    ) as string;
 
     if (!accountSid || !authToken || !this.verifyServiceSid) {
       throw new Error('Twilio Verify configuration is missing');
     }
 
-    this.messagingServiceSid = this.configService.get<string>('TWILIO_MESSAGING_SERVICE_SID');
+    this.messagingServiceSid = this.configService.get<string>(
+      'TWILIO_MESSAGING_SERVICE_SID',
+    );
 
     this.twilioClient = twilio(accountSid, authToken);
   }
@@ -64,14 +59,23 @@ export class SMSService {
 
   async sendMessage(to: string, body: string): Promise<void> {
     if (!this.messagingServiceSid) {
-      this.logger.warn('TWILIO_MESSAGING_SERVICE_SID not configured — skipping SMS notification');
+      this.logger.warn(
+        'TWILIO_MESSAGING_SERVICE_SID not configured — skipping SMS notification',
+      );
       return;
     }
     try {
-      await this.twilioClient.messages.create({ to, messagingServiceSid: this.messagingServiceSid, body });
+      await this.twilioClient.messages.create({
+        to,
+        messagingServiceSid: this.messagingServiceSid,
+        body,
+      });
       this.logger.log(`SMS sent to ${maskPhone(to)}`);
     } catch (error) {
-      this.logger.error(`Failed to send SMS to ${maskPhone(to)}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Failed to send SMS to ${maskPhone(to)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     }
   }

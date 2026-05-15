@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '../entities/user.entity';
@@ -12,12 +16,12 @@ export class UserService {
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(PaymentInfoEntity)
     private readonly paymentInfoRepository: Repository<PaymentInfoEntity>,
-  ) {}
+  ) { }
 
   /**
    * Get user profile by ID
    */
-  async getProfile(userId: string): Promise<any> {
+  async getProfile(userId: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
@@ -25,7 +29,9 @@ export class UserService {
     }
 
     if (!user.isActive) {
-      throw new ForbiddenException('Account is not active. Please verify your email to activate your account.');
+      throw new ForbiddenException(
+        'Account is not active. Please verify your email to activate your account.',
+      );
     }
 
     const paymentInfo = await this.paymentInfoRepository.findOne({
@@ -52,10 +58,7 @@ export class UserService {
   /**
    * Update user profile
    */
-  async updateProfile(
-    userId: string,
-    updateProfileDTO: UpdateProfileDTO,
-  ): Promise<{ message: string; user: any }> {
+  async updateProfile(userId: string, updateProfileDTO: UpdateProfileDTO) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
@@ -63,7 +66,9 @@ export class UserService {
     }
 
     if (!user.isActive) {
-      throw new ForbiddenException('Account is not active. Please verify your email to activate your account.');
+      throw new ForbiddenException(
+        'Account is not active. Please verify your email to activate your account.',
+      );
     }
 
     // Update profile fields
@@ -122,12 +127,15 @@ export class UserService {
     }
 
     if (!user.isActive) {
-      throw new ForbiddenException('Account is not active. Please verify your email to activate your account.');
+      throw new ForbiddenException(
+        'Account is not active. Please verify your email to activate your account.',
+      );
     }
 
-    let paymentInfo: PaymentInfoEntity | null = await this.paymentInfoRepository.findOne({
-      where: { userId },
-    });
+    let paymentInfo: PaymentInfoEntity | null =
+      await this.paymentInfoRepository.findOne({
+        where: { userId },
+      });
 
     if (!paymentInfo) {
       paymentInfo = this.paymentInfoRepository.create({

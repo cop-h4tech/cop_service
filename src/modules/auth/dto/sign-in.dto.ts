@@ -1,4 +1,11 @@
-import { IsEmail, IsEnum, IsOptional, IsPhoneNumber, IsString, ValidateIf } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
 
 export enum AuthMode {
   OTP = 'otp',
