@@ -40,11 +40,11 @@ export class AuthController {
 
     /**
      * POST /auth/login/otp
-     * Step 2 of OTP login — submit the OTP received by email.
+     * Step 2 of OTP login — submit the SMS OTP received on the registered phone.
      */
     @Post('login/otp')
-    async verifyLoginOTP(@Body() body: { email: string; code: string }) {
-        return this.authService.verifyLoginOTP(body.email, body.code);
+    async verifyLoginOTP(@Body() dto: VerifySMSOTPDTO) {
+        return this.authService.verifyLoginOTP(dto.phone, dto.code);
     }
 
     /**

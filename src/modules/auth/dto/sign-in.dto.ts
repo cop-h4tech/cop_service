@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsPhoneNumber, IsString } from 'class-validator';
 
 export enum AuthMode {
   OTP = 'otp',
@@ -6,8 +6,8 @@ export enum AuthMode {
 }
 
 export class LoginDTO {
-  @IsEmail()
-  email!: string;
+  @IsPhoneNumber()
+  phone!: string;
 
   @IsEnum(AuthMode)
   authMode!: AuthMode;

@@ -17,7 +17,7 @@ export class SMSService {
 
   private readonly verifyServiceSid: string;
 
-  private readonly fromPhone: string | undefined;
+  private readonly messagingServiceSid: string | undefined;
 
   constructor(
     private readonly configService: ConfigService,
@@ -35,7 +35,7 @@ export class SMSService {
       throw new Error('Twilio Verify configuration is missing');
     }
 
-    this.fromPhone = this.configService.get<string>('TWILIO_PHONE_NUMBER');
+    this.messagingServiceSid = this.configService.get<string>('TWILIO_MESSAGING_SERVICE_SID');
 
     this.twilioClient = twilio(accountSid, authToken);
   }
@@ -63,12 +63,12 @@ export class SMSService {
   }
 
   async sendMessage(to: string, body: string): Promise<void> {
-    if (!this.fromPhone) {
-      this.logger.warn('TWILIO_PHONE_NUMBER not configured — skipping SMS notification');
+    if (!this.messagingServiceSid) {
+      this.logger.warn('TWILIO_MESSAGING_SERVICE_SID not configured — skipping SMS notification');
       return;
     }
     try {
-      await this.twilioClient.messages.create({ to, from: this.fromPhone, body });
+      await this.twilioClient.messages.create({ to, messagingServiceSid: this.messagingServiceSid, body });
       this.logger.log(`SMS sent to ${maskPhone(to)}`);
     } catch (error) {
       this.logger.error(`Failed to send SMS to ${maskPhone(to)}`, error instanceof Error ? error.stack : undefined);

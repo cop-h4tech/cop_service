@@ -62,20 +62,17 @@ export class AuthService {
     }
 
     if (signUpDTO.phone) {
-      try {
-        await this.smsService.sendOTP(signUpDTO.phone);
-      } catch (err) {
-        this.logger.warn(
-          `SMS OTP delivery failed for ${maskPhone(signUpDTO.phone)} — account created, user must request SMS OTP manually. Reason: ${err instanceof Error ? err.message : err}`,
-        );
-      }
+      await this.trySendSignupSMS(signUpDTO.phone);
     }
 
-    const verifyInstructions = signUpDTO.email && signUpDTO.phone
-      ? 'Please verify your email and phone with the OTPs sent.'
-      : signUpDTO.email
-        ? 'Please verify your email with the OTP sent.'
-        : 'Please verify your phone number with the OTP sent.';
+    let verifyInstructions: string;
+    if (signUpDTO.email && signUpDTO.phone) {
+      verifyInstructions = 'Please verify your email and phone with the OTPs sent.';
+    } else if (signUpDTO.email) {
+      verifyInstructions = 'Please verify your email with the OTP sent.';
+    } else {
+      verifyInstructions = 'Please verify your phone number with the OTP sent.';
+    }
 
     return {
       message: `Sign up successful. ${verifyInstructions}`,
@@ -84,10 +81,10 @@ export class AuthService {
   }
 
   async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; accessToken?: string; refreshToken?: string; expiresIn?: number }> {
-    const user = await this.userRepository.findOne({ where: { email: loginDTO.email } });
+    const user = await this.userRepository.findOne({ where: { phone: loginDTO.phone } });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email address');
+      throw new UnauthorizedException('Invalid phone number');
     }
 
     if (!user.isActive) {
@@ -110,13 +107,15 @@ export class AuthService {
     }
 
     if (loginDTO.authMode === AuthMode.OTP) {
-      if (!user.email) {
-        throw new BadRequestException('OTP login via email requires an email address on this account');
+      try {
+        await this.smsService.sendOTP(loginDTO.phone);
+      } catch (err) {
+        this.logger.error(
+          `SMS OTP send failed for ${maskPhone(loginDTO.phone)} during OTP login. Reason: ${err instanceof Error ? err.message : err}`,
+        );
+        throw new BadRequestException('Failed to send OTP to your phone number');
       }
-      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNIN, user.email);
-      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNIN);
-
-      return { message: 'OTP sent to your registered email', authMode: AuthMode.OTP };
+      return { message: 'OTP sent to your registered phone number', authMode: AuthMode.OTP };
     }
 
     if (!loginDTO.password) {
@@ -133,15 +132,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid password');
     }
 
-    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.id);
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
     return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, accessToken, refreshToken, expiresIn };
   }
 
-  async verifyLoginOTP(email: string, otp: string): Promise<{ message: string; accessToken: string; refreshToken: string; expiresIn: number }> {
-    const user = await this.userRepository.findOne({ where: { email } });
+  async verifyLoginOTP(phone: string, otp: string): Promise<{ message: string; accessToken: string; refreshToken: string; expiresIn: number }> {
+    const user = await this.userRepository.findOne({ where: { phone } });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email address');
+      throw new UnauthorizedException('Invalid phone number');
     }
 
     if (!user.isActive) {
@@ -150,13 +149,13 @@ export class AuthService {
       );
     }
 
-    const isOTPValid = await this.otpService.verifyOTP(user, otp, OTPPurpose.SIGNIN);
+    const isOTPValid = await this.smsService.verifyOTP(phone, otp);
 
     if (!isOTPValid) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.id);
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
     return { message: 'Sign in successful', accessToken, refreshToken, expiresIn };
   }
 
@@ -311,5 +310,16 @@ export class AuthService {
     await this.sessionService.revokeAllUserSessions(userId);
 
     return { message: 'Password changed successfully' };
+  }
+
+  private async trySendSignupSMS(phone: string): Promise<void> {
+    try {
+      await this.smsService.sendOTP(phone);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `SMS OTP delivery failed for ${maskPhone(phone)} — account created, user must request SMS OTP manually. Reason: ${reason}`,
+      );
+    }
   }
 }
