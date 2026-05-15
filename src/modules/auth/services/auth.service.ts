@@ -81,59 +81,33 @@ export class AuthService {
   }
 
   async login(loginDTO: LoginDTO): Promise<{ message: string; authMode: AuthMode; accessToken?: string; refreshToken?: string; expiresIn?: number }> {
-    const user = await this.userRepository.findOne({ where: { phone: loginDTO.phone } });
+    if (!loginDTO.email && !loginDTO.phone) {
+      throw new BadRequestException('Either email or phone is required');
+    }
+
+    const where = loginDTO.email ? { email: loginDTO.email } : { phone: loginDTO.phone };
+    const user = await this.userRepository.findOne({ where });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid phone number');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isActive) {
-      if (user.email) {
-        const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
-        await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
-      }
-      if (user.phone) {
-        try {
-          await this.smsService.sendOTP(user.phone);
-        } catch (err) {
-          this.logger.warn(
-            `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
-          );
-        }
-      }
+      await this.resendActivationOTPs(user);
       throw new ForbiddenException(
         'Account is not active. Please verify your registered contact to activate your account.',
       );
     }
 
     if (loginDTO.authMode === AuthMode.OTP) {
-      try {
-        await this.smsService.sendOTP(loginDTO.phone);
-      } catch (err) {
-        this.logger.error(
-          `SMS OTP send failed for ${maskPhone(loginDTO.phone)} during OTP login. Reason: ${err instanceof Error ? err.message : err}`,
-        );
-        throw new BadRequestException('Failed to send OTP to your phone number');
+      const phone = loginDTO.phone ?? user.phone;
+      if (!phone) {
+        throw new BadRequestException('No phone number on this account for OTP login');
       }
-      return { message: 'OTP sent to your registered phone number', authMode: AuthMode.OTP };
+      return this.handleOTPLogin(phone);
     }
 
-    if (!loginDTO.password) {
-      throw new BadRequestException('Password is required for password authentication');
-    }
-
-    if (!user.password) {
-      throw new BadRequestException('No password set for this account. Please use OTP authentication.');
-    }
-
-    const isPasswordValid = await bcrypt.compare(loginDTO.password, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid password');
-    }
-
-    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
-    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, accessToken, refreshToken, expiresIn };
+    return this.handlePasswordLogin(loginDTO, user);
   }
 
   async verifyLoginOTP(phone: string, otp: string): Promise<{ message: string; accessToken: string; refreshToken: string; expiresIn: number }> {
@@ -310,6 +284,52 @@ export class AuthService {
     await this.sessionService.revokeAllUserSessions(userId);
 
     return { message: 'Password changed successfully' };
+  }
+
+  private async resendActivationOTPs(user: UserEntity): Promise<void> {
+    if (user.email) {
+      const emailOtp = await this.otpService.createOTP(user, OTPPurpose.SIGNUP, user.email);
+      await this.emailService.sendOTP(user.email, emailOtp.code, OTPPurpose.SIGNUP);
+    }
+    if (user.phone) {
+      try {
+        await this.smsService.sendOTP(user.phone);
+      } catch (err) {
+        this.logger.warn(
+          `SMS OTP resend failed for ${maskPhone(user.phone)} during login attempt. Reason: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+  }
+
+  private async handleOTPLogin(phone: string): Promise<{ message: string; authMode: AuthMode }> {
+    try {
+      await this.smsService.sendOTP(phone);
+    } catch (err) {
+      this.logger.error(
+        `SMS OTP send failed for ${maskPhone(phone)} during OTP login. Reason: ${err instanceof Error ? err.message : err}`,
+      );
+      throw new BadRequestException('Failed to send OTP to your phone number');
+    }
+    return { message: 'OTP sent to your registered phone number', authMode: AuthMode.OTP };
+  }
+
+  private async handlePasswordLogin(
+    loginDTO: LoginDTO,
+    user: UserEntity,
+  ): Promise<{ message: string; authMode: AuthMode; accessToken: string; refreshToken: string; expiresIn: number }> {
+    if (!loginDTO.password) {
+      throw new BadRequestException('Password is required for password authentication');
+    }
+    if (!user.password) {
+      throw new BadRequestException('No password set for this account. Please use OTP authentication.');
+    }
+    const isPasswordValid = await bcrypt.compare(loginDTO.password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+    const { accessToken, refreshToken, expiresIn } = await this.sessionService.createSession(user.id, user.email ?? user.phone ?? user.id);
+    return { message: 'Sign in successful', authMode: AuthMode.PASSWORD, accessToken, refreshToken, expiresIn };
   }
 
   private async trySendSignupSMS(phone: string): Promise<void> {
