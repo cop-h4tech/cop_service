@@ -17,6 +17,7 @@ export class SMSService {
 
   private readonly verifyServiceSid: string;
 
+  private readonly fromPhone: string | undefined;
 
   constructor(
     private readonly configService: ConfigService,
