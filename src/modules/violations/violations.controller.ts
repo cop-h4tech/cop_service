@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -17,6 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ViolationsService } from './violations.service';
 import { SubmitViolationDto } from './dto/submit-violation.dto';
 import { PHOTO_MIMES, VIDEO_MIMES } from './violations.constants';
+import { PaginationQueryDTO } from '../../common/dto/pagination-query.dto';
 const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 const PHOTO_MAX_COUNT = 5;
@@ -81,8 +83,11 @@ export class ViolationsController {
   }
 
   @Get()
-  async findAll(@CurrentUser() user: { userId: string }) {
-    return this.violationsService.findAllByUser(user.userId);
+  async findAll(
+    @CurrentUser() user: { userId: string },
+    @Query() query: PaginationQueryDTO,
+  ) {
+    return this.violationsService.findAllByUser(user.userId, query);
   }
 
   @Get(':id')

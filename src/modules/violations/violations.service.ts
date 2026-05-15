@@ -14,6 +14,8 @@ import { UserEntity } from '../auth/entities/user.entity';
 import { EmailService } from '../auth/services/email.service';
 import { SMSService } from '../auth/services/sms.service';
 import { PHOTO_MIMES } from './violations.constants';
+import { PaginationQueryDTO } from '../../common/dto/pagination-query.dto';
+import { PaginatedResponseDTO } from '../../common/dto/paginated-response.dto';
 
 function utcCompact(): string {
   return new Date()
@@ -117,12 +119,19 @@ export class ViolationsService {
     return this.toResponse(saved);
   }
 
-  async findAllByUser(userId: string): Promise<ViolationResponseDto[]> {
-    const violations = await this.violationRepository.find({
+  async findAllByUser(
+    userId: string,
+    query: PaginationQueryDTO,
+  ): Promise<PaginatedResponseDTO<ViolationResponseDto>> {
+    const { page, limit } = query;
+    const [violations, total] = await this.violationRepository.findAndCount({
       where: { userId },
-      order: { createdAt: 'DESC' },
+      order: { updatedAt: 'DESC' },
+      take: limit,
+      skip: (page - 1) * limit,
     });
-    return Promise.all(violations.map((v) => this.toResponse(v)));
+    const data = await Promise.all(violations.map((v) => this.toResponse(v)));
+    return new PaginatedResponseDTO(data, total, page, limit);
   }
 
   private async sendSubmissionNotifications(
