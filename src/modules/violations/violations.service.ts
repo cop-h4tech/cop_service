@@ -11,11 +11,12 @@ import { SubmitViolationDto } from './dto/submit-violation.dto';
 import { ViolationResponseDto } from './dto/violation-response.dto';
 import { S3Service } from '../s3/s3.service';
 import { UserEntity } from '../auth/entities/user.entity';
-import { EmailService } from '../auth/services/email.service';
-import { SMSService } from '../auth/services/sms.service';
+import { EmailService } from '../notifications/email.service';
+import { SMSService } from '../notifications/sms.service';
 import { PHOTO_MIMES } from './violations.constants';
 import { PaginationQueryDTO } from '../../common/dto/pagination-query.dto';
 import { PaginatedResponseDTO } from '../../common/dto/paginated-response.dto';
+import { OfficerViolationListQueryDto } from './dto/officer-violation-list-query.dto';
 
 function utcCompact(): string {
   return new Date()
@@ -37,7 +38,7 @@ export class ViolationsService {
     private readonly emailService: EmailService,
     private readonly smsService: SMSService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   private generateTicketNumber(): string {
     const datePart = new Date().toISOString().slice(0, 10).replaceAll('-', '');
@@ -151,6 +152,38 @@ export class ViolationsService {
     if (user.phone) {
       await this.smsService.sendMessage(user.phone, message);
     }
+  }
+
+  async findAllForOfficer(
+    query: OfficerViolationListQueryDto,
+  ): Promise<
+    PaginatedResponseDTO<
+      ViolationResponseDto & { submitterEmail?: string; submitterName?: string }
+    >
+  > {
+    const { page, limit } = query;
+    const where = query.status ? { status: query.status } : {};
+    const [violations, total] = await this.violationRepository.findAndCount({
+      where,
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip: (page - 1) * limit,
+    });
+    const data = await Promise.all(
+      violations.map(async (v) => {
+        const base = await this.toResponse(v);
+        const user = v.user as UserEntity | undefined;
+        return {
+          ...base,
+          submitterEmail: user?.email,
+          submitterName:
+            [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+            undefined,
+        };
+      }),
+    );
+    return new PaginatedResponseDTO(data, total, page, limit);
   }
 
   async findOneByUser(

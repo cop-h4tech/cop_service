@@ -104,7 +104,7 @@ PostgreSQL enforces the following rules for identifiers (table names, column nam
 - Table names: **plural snake_case** — `users`, `payment_info`, `otps`, `sessions`
 - Column names: **snake_case** — `first_name`, `email_verified`, `created_at`
 - Foreign key columns: **snake_case** — `user_id`, `order_id`
-- Migration files: timestamp prefix — `Migration1715698800000.ts`
+- Migration files: timestamp prefix — `Migration1715698800000.ts` — **never write migration files by hand; always generate them by running `npm run makemigration` after updating entities**
 
 **TypeORM rule:** Always set an explicit `name` in `@Column()`, `@CreateDateColumn()`, `@UpdateDateColumn()`, and `@JoinColumn()` whenever the TypeScript property is camelCase. Without it, TypeORM writes the camelCase name directly and PostgreSQL lowercases it (e.g., `firstName` → column `firstname`, not `first_name`).
 

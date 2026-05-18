@@ -8,7 +8,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 @Controller('profile')
 @UseGuards(AuthGuard)
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService) {}
 
   @Get()
   async getProfile(@CurrentUser() user: { userId: string }) {

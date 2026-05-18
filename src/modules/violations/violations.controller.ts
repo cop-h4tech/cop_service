@@ -28,7 +28,7 @@ const TOTAL_MAX_COUNT = PHOTO_MAX_COUNT + VIDEO_MAX_COUNT;
 @Controller('violations')
 @UseGuards(AuthGuard)
 export class ViolationsController {
-  constructor(private readonly violationsService: ViolationsService) { }
+  constructor(private readonly violationsService: ViolationsService) {}
 
   @Post()
   @UseInterceptors(

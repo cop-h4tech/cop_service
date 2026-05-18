@@ -46,4 +46,5 @@ export class SignUpDTO {
   @IsString()
   @Match('password', { message: 'Passwords do not match' })
   confirmPassword?: string;
+
 }

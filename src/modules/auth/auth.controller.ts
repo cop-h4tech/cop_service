@@ -16,15 +16,21 @@ import { CurrentUser } from './decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   /**
    * POST /auth/signup
    * Register a new user. Sends OTP to email and SMS for verification.
    */
   @Post('signup')
-  async signUp(@Body() signUpDTO: SignUpDTO) {
-    return this.authService.signUp(signUpDTO);
+  async signUp(
+    @Body() signUpDTO: SignUpDTO,
+    @Headers('authorization') authorization?: string,
+  ) {
+    const invitationToken = authorization?.startsWith('Bearer ')
+      ? authorization.slice(7)
+      : undefined;
+    return this.authService.signUp(signUpDTO, invitationToken);
   }
 
   /**

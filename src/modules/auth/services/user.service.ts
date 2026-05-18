@@ -16,7 +16,7 @@ export class UserService {
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(PaymentInfoEntity)
     private readonly paymentInfoRepository: Repository<PaymentInfoEntity>,
-  ) { }
+  ) {}
 
   /**
    * Get user profile by ID

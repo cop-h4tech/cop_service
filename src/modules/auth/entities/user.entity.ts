@@ -7,6 +7,7 @@ import {
   BeforeInsert,
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 export class UserEntity {
@@ -42,6 +43,14 @@ export class UserEntity {
 
   @Column({ type: 'boolean', default: false, name: 'phone_verified' })
   phoneVerified!: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+    name: 'role',
+  })
+  role!: UserRole;
 
   @Column({ type: 'boolean', default: true, name: 'is_active' })
   isActive!: boolean;

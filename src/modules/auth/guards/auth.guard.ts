@@ -7,10 +7,11 @@ import {
 import { verify } from 'jsonwebtoken';
 import { Request } from 'express';
 import { SessionService } from '../services/session.service';
+import { UserRole } from '../enums/user-role.enum';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly sessionService: SessionService) { }
+  constructor(private readonly sessionService: SessionService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -28,7 +29,7 @@ export class AuthGuard implements CanActivate {
       const payload = verify(
         token,
         process.env.JWT_SECRET ?? 'change-me-in-production',
-      ) as { userId: string; email: string };
+      ) as { userId: string; email: string; role: UserRole };
 
       await this.sessionService.validateSession(token);
       (request as Request & Record<string, unknown>)['user'] = payload;

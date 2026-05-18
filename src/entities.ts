@@ -2,6 +2,7 @@ import { UserEntity } from './modules/auth/entities/user.entity';
 import { OtpEntity } from './modules/auth/entities/otp.entity';
 import { PaymentInfoEntity } from './modules/auth/entities/payment-info.entity';
 import { SessionEntity } from './modules/auth/entities/session.entity';
+import { InvitationTokenEntity } from './modules/auth/entities/invitation-token.entity';
 import { ViolationEntity } from './modules/violations/entities/violation.entity';
 
 export const entities = [
@@ -9,5 +10,6 @@ export const entities = [
   OtpEntity,
   PaymentInfoEntity,
   SessionEntity,
+  InvitationTokenEntity,
   ViolationEntity,
 ];
