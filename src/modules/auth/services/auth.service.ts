@@ -20,10 +20,12 @@ import {
 } from '../dto/reset-password.dto';
 import { ChangePasswordDTO } from '../dto/change-password.dto';
 import { OTPService } from './otp.service';
-import { EmailService } from './email.service';
+import { EmailService } from '../../notifications/email.service';
 import { SessionService } from './session.service';
-import { SMSService } from './sms.service';
+import { SMSService } from '../../notifications/sms.service';
+import { InvitationService } from './invitation.service';
 import { OTPPurpose } from '../entities/otp.entity';
+import { UserRole } from '../enums/user-role.enum';
 import { maskPhone } from '../utils/mask.util';
 
 @Injectable()
@@ -37,7 +39,8 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly sessionService: SessionService,
     private readonly smsService: SMSService,
-  ) { }
+    private readonly invitationService: InvitationService,
+  ) {}
 
   async signUp(
     signUpDTO: SignUpDTO,
@@ -59,6 +62,14 @@ export class AuthService {
       );
     }
 
+    let role = UserRole.USER;
+    if (signUpDTO.invitationToken && signUpDTO.email) {
+      role = await this.invitationService.useInvitation(
+        signUpDTO.invitationToken,
+        signUpDTO.email,
+      );
+    }
+
     const user = this.userRepository.create({
       email: signUpDTO.email,
       phone: signUpDTO.phone,
@@ -68,6 +79,7 @@ export class AuthService {
       address: signUpDTO.address,
       zipCode: signUpDTO.zipCode,
       password: signUpDTO.password ?? undefined,
+      role,
       isActive: false,
     });
 
@@ -177,6 +189,7 @@ export class AuthService {
       await this.sessionService.createSession(
         user.id,
         user.email ?? user.phone ?? user.id,
+        user.role,
       );
     return {
       message: 'Sign in successful',
@@ -450,6 +463,7 @@ export class AuthService {
       await this.sessionService.createSession(
         user.id,
         user.email ?? user.phone ?? user.id,
+        user.role,
       );
     return {
       message: 'Sign in successful',

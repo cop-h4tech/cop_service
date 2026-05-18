@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import twilio, { Twilio } from 'twilio';
-import { maskPhone } from '../utils/mask.util';
+import { maskPhone } from '../auth/utils/mask.util';
 
 @Injectable()
 export class SMSService {

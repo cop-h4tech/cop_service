@@ -2,6 +2,7 @@ import {
   IsEmail,
   IsPhoneNumber,
   IsString,
+  IsUUID,
   MinLength,
   IsOptional,
   Matches,
@@ -46,4 +47,8 @@ export class SignUpDTO {
   @IsString()
   @Match('password', { message: 'Passwords do not match' })
   confirmPassword?: string;
+
+  @IsOptional()
+  @IsUUID()
+  invitationToken?: string;
 }

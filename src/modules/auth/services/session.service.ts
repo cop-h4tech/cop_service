@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { sign } from 'jsonwebtoken';
 import { randomBytes } from 'node:crypto';
 import { SessionEntity } from '../entities/session.entity';
+import { UserEntity } from '../entities/user.entity';
+import { UserRole } from '../enums/user-role.enum';
 
 export interface TokenPair {
   accessToken: string;
@@ -16,15 +18,19 @@ export class SessionService {
   constructor(
     @InjectRepository(SessionEntity)
     private readonly sessionRepository: Repository<SessionEntity>,
-  ) { }
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+  ) {}
 
   async createSession(
     userId: string,
     userIdentifier: string,
+    role: UserRole = UserRole.USER,
   ): Promise<TokenPair> {
     const { accessToken, expiresAt, expiresIn } = this.buildAccessToken(
       userId,
       userIdentifier,
+      role,
     );
     const { refreshToken, refreshTokenExpiresAt } = this.buildRefreshToken();
 
@@ -59,9 +65,13 @@ export class SessionService {
       );
     }
 
+    const user = await this.userRepository.findOne({
+      where: { id: session.userId },
+    });
     const { accessToken, expiresAt, expiresIn } = this.buildAccessToken(
       session.userId,
       session.userIdentifier,
+      user?.role ?? UserRole.USER,
     );
     const { refreshToken: newRefreshToken, refreshTokenExpiresAt } =
       this.buildRefreshToken();
@@ -105,6 +115,7 @@ export class SessionService {
   private buildAccessToken(
     userId: string,
     userIdentifier: string,
+    role: UserRole,
   ): { accessToken: string; expiresAt: Date; expiresIn: number } {
     const expiresIn = Number.parseInt(
       process.env.ACCESS_TOKEN_TTL_SECONDS ?? '900',
@@ -112,7 +123,12 @@ export class SessionService {
     );
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
     const accessToken = sign(
-      { jti: randomBytes(16).toString('hex'), userId, email: userIdentifier },
+      {
+        jti: randomBytes(16).toString('hex'),
+        userId,
+        email: userIdentifier,
+        role,
+      },
       process.env.JWT_SECRET ?? 'change-me-in-production',
       { expiresIn },
     );
