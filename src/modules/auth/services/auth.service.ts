@@ -44,6 +44,7 @@ export class AuthService {
 
   async signUp(
     signUpDTO: SignUpDTO,
+    invitationToken?: string,
   ): Promise<{ message: string; identifier: string }> {
     if (!signUpDTO.email && !signUpDTO.phone) {
       throw new BadRequestException('Either email or phone number is required');
@@ -63,9 +64,9 @@ export class AuthService {
     }
 
     let role = UserRole.USER;
-    if (signUpDTO.invitationToken && signUpDTO.email) {
+    if (invitationToken && signUpDTO.email) {
       role = await this.invitationService.useInvitation(
-        signUpDTO.invitationToken,
+        invitationToken,
         signUpDTO.email,
       );
     }
